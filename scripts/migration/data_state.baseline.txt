@@ -1,0 +1,18 @@
+# Baseline runtime — capturée en Phase A pour la GATE B8 (continuité des données).
+# Ce fichier est committable (comptes uniquement). Le contenu réel reste local.
+
+facts.total = 18
+facts.by_status = [('active', 18)]
+events.total = 11
+
+tokens (-1 = absent) :
+  google_credentials.json = 482
+  google_token.json = -1
+  google_gmail_token.json = 781
+  spotify_token.json = 475
+  deezer_token.json = -1
+
+skills.installed.dirs = 8
+skills.installed.loaded_by_registry = ['astronomy', 'bambulab-printer', 'clock', 'fusion360', 'globe-view', 'mode-streameur', 'system-monitor', 'weather']
+
+vision_data.faces.files = 1

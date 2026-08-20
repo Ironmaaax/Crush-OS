@@ -1,0 +1,3657 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Le titre est reecrit en fin de <body>, avec les autres elements portant le
+       nom de l'assistant : window.CRUSH_ASSISTANT_NAME est injecte juste avant
+       </head> par inject_client_config(), donc indisponible a ce point du parse. -->
+  <title>Crush</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/globe.css">
+  <link rel="stylesheet" href="/wakeup.css">
+  <link rel="stylesheet" href="/_shared.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    @font-face {
+      font-family: 'Landasans';
+      src: url('fonts/Landasans-Medium.otf') format('opentype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #06080D;
+      --blue: #2D7DD2;
+      --blue-bright: #4A9EFF;
+      --gold: #B8963E;
+      --text: #DCE8FF;
+      --text-dim: #3A4558;
+      --green: #36D399;
+      --sep: rgba(74, 158, 255, 0.08);
+      --panel: rgba(6, 8, 20, 0.84);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ── Aurora — toutes les vues ────────────────────────────────── */
+    #aurora-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background:
+        radial-gradient(80vw 60vh at 12% 8%, rgba(74,158,255,.09), transparent 60%),
+        radial-gradient(60vw 50vh at 92% 96%, rgba(184,150,62,.06), transparent 60%);
+    }
+
+    /* ── SPA panel (Dashboard & Settings) ───────────────────────── */
+    #spa-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      opacity: 0;
+      background: var(--bg-0, #06080D);
+      font-family: "Geist", "Inter", -apple-system, system-ui, sans-serif;
+      font-size: 13px;
+      color: var(--fg-0, #DCE8FF);
+    }
+    /* Aurora overlay inside SPA panel — renders above card surfaces */
+    #spa-aurora {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      background:
+        radial-gradient(80vw 60vh at 12% 8%, rgba(74,158,255,.09), transparent 60%),
+        radial-gradient(60vw 50vh at 92% 96%, rgba(184,150,62,.06), transparent 60%);
+    }
+    #spa-panel .app { background: transparent; }
+    #spa-panel .main { background: transparent; padding-bottom: 72px; }
+
+    /* ── Three.js canvas behind everything ───────────────────────── */
+    #three-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: block;
+    }
+
+    /* ── Grain + Vignette overlays ───────────────────────────────── */
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0.022;
+      filter: url(#grain-filter);
+      background: #888;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(ellipse 65% 75% at 50% 50%,
+          transparent 30%, rgba(6, 8, 13, 0.4) 62%, rgba(6, 8, 13, 0.85) 100%);
+    }
+
+    /* ── 3-column layout ─────────────────────────────────────────── */
+    .layout {
+      position: fixed;
+      inset: 0 0 28px 0;
+      display: grid;
+      grid-template-columns: 300px 1fr 360px;
+      z-index: 10;
+    }
+
+    .panel-center {
+      pointer-events: none;
+    }
+
+    /* ── Shared panel ────────────────────────────────────────────── */
+    .panel-left,
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-left {
+      background: transparent;
+      position: relative;
+    }
+
+    .panel-right {
+      background: transparent;
+      position: relative;
+      padding-right: 4px;
+    }
+
+    /* ── Left: brand header ──────────────────────────────────────── */
+    .brand {
+      padding: 24px 18px 20px 24px;
+      flex-shrink: 0;
+    }
+
+    .brand-name {
+      font: 500 22px/1 'Landasans', 'Syne', sans-serif;
+      letter-spacing: 0.24em;
+      color: #fff;
+      text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+    }
+
+    .brand-status {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font: 400 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── Section cards ───────────────────────────────────────────── */
+    .section {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      margin: 0 12px 10px 12px;
+      border: 1px solid rgba(74, 158, 255, 0.18);
+      border-radius: 10px;
+      background: rgba(5, 7, 20, 0.82);
+    }
+
+    .section+.section {
+      border-top: 1px solid rgba(74, 158, 255, 0.18);
+    }
+
+    .section-hd {
+      padding: 11px 16px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.10);
+    }
+
+    .section-label {
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      color: rgba(100, 168, 255, 0.80);
+    }
+
+    .section-badge {
+      font: 500 10px/1 'DM Mono', monospace;
+      color: rgba(180, 210, 255, 0.9);
+      background: rgba(74, 158, 255, 0.15);
+      padding: 3px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(74, 158, 255, 0.20);
+    }
+
+    /* ── Events ──────────────────────────────────────────────────── */
+    .events {
+      padding: 0 16px 6px;
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 42px 1fr 10px;
+      gap: 0 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.07);
+      align-items: start;
+    }
+
+    .event:last-child {
+      border-bottom: none;
+    }
+
+    .ev-time {
+      font: 400 13px/1.3 'DM Mono', monospace;
+      color: var(--blue-bright);
+      padding-top: 1px;
+    }
+
+    .ev-name {
+      font: 500 13px/1.3 'DM Sans', sans-serif;
+      color: #fff;
+    }
+
+    .ev-sub {
+      font: 400 11px/1.3 'DM Sans', sans-serif;
+      color: rgba(170, 195, 230, 0.65);
+      margin-top: 3px;
+    }
+
+    .ev-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--blue-bright);
+      opacity: 0.45;
+      margin-top: 5px;
+    }
+
+    /* ── Tasks ───────────────────────────────────────────────────── */
+    .tasks {
+      padding: 4px 16px 6px;
+    }
+
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.09);
+      font: 400 13px/1.3 'DM Sans', sans-serif;
+      color: #fff;
+    }
+
+    .task:last-child {
+      border-bottom: none;
+    }
+
+    .task.done {
+      color: rgba(130, 158, 200, 0.65);
+      text-decoration: line-through;
+      text-decoration-color: rgba(100, 130, 180, 0.45);
+    }
+
+    .task-ico {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* ── Focus / player ──────────────────────────────────────────── */
+    .focus {
+      flex-shrink: 0;
+    }
+
+    /* ── Left scrollable area ─────────────────────────────────────── */
+    .left-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(74, 158, 255, 0.08) transparent;
+    }
+
+    .left-scroll::-webkit-scrollbar {
+      width: 2px;
+    }
+
+    .left-scroll::-webkit-scrollbar-thumb {
+      background: rgba(74, 158, 255, 0.10);
+      border-radius: 2px;
+    }
+
+    /* ── Permissions ──────────────────────────────────────────────── */
+    .perms-section {
+      flex-shrink: 0;
+    }
+
+    .perms-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 7px;
+      padding: 10px 12px 12px;
+    }
+
+    .perm-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 11px 4px 9px;
+      border: 1px solid rgba(74, 158, 255, 0.09);
+      border-radius: 8px;
+      background: rgba(5, 7, 20, 0.45);
+      cursor: pointer;
+      color: rgba(55, 80, 125, 0.70);
+      transition: all 0.18s;
+      outline: none;
+    }
+
+    .perm-btn:hover {
+      border-color: rgba(74, 158, 255, 0.24);
+      color: rgba(100, 150, 220, 0.80);
+    }
+
+    .perm-btn.active {
+      border-color: rgba(74, 158, 255, 0.38);
+      background: rgba(45, 125, 210, 0.10);
+      color: var(--blue-bright);
+      box-shadow: 0 0 12px rgba(74, 158, 255, 0.08), inset 0 0 8px rgba(74, 158, 255, 0.04);
+    }
+
+    #perm-microphone[data-state="listening"] {
+      border-color: rgba(74, 158, 255, 0.70);
+      animation: mic-pulse 1.4s ease-in-out infinite;
+    }
+
+    #perm-microphone[data-state="processing"],
+    #perm-microphone[data-state="responding"] {
+      border-color: rgba(74, 158, 255, 0.50);
+    }
+
+    @keyframes mic-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 6px rgba(74, 158, 255, 0.10);
+      }
+
+      50% {
+        box-shadow: 0 0 18px rgba(74, 158, 255, 0.35), 0 0 36px rgba(74, 158, 255, 0.12);
+      }
+    }
+
+    .perm-label {
+      font: 500 7px/1 'DM Mono', monospace;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+    }
+
+    /* ── Camera floating window ───────────────────────────────────── */
+    .cam-win {
+      position: fixed;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(74, 158, 255, 0.22);
+      border-radius: 10px;
+      background: rgba(5, 7, 20, 0.94);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(74, 158, 255, 0.06);
+      overflow: hidden;
+      width: 480px;
+      left: 320px;
+      top: 120px;
+    }
+
+    .cam-win-hd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 10px 8px 13px;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.10);
+      cursor: grab;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .cam-win-hd:active {
+      cursor: grabbing;
+    }
+
+    .cam-win-title {
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(100, 168, 255, 0.80);
+    }
+
+    .cam-win-btns {
+      display: flex;
+      gap: 4px;
+    }
+
+    .cam-ctrl-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(74, 158, 255, 0.38);
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s, background 0.15s;
+      outline: none;
+    }
+
+    .cam-ctrl-btn:hover {
+      color: var(--blue-bright);
+      background: rgba(74, 158, 255, 0.08);
+    }
+
+    .cam-body {
+      position: relative;
+    }
+
+    #cam-video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      transform: scaleX(-1);
+      /* miroir naturel */
+    }
+
+    .cam-live-pill {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font: 500 7px/1 'DM Mono', monospace;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: #ef4444;
+      background: rgba(0, 0, 0, 0.52);
+      padding: 3px 6px 3px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .cam-live-pill .dot {
+      background: #ef4444;
+      width: 5px;
+      height: 5px;
+      box-shadow: 0 0 5px rgba(239, 68, 68, 0.7);
+      animation: blink 1.4s step-start infinite;
+    }
+
+    .cam-win.minimized .cam-body {
+      display: none;
+    }
+
+    /* ── MediaPipe overlays ───────────────────────────────────────── */
+    #cam-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      transform: scaleX(-1);
+      /* miroir = même sens que la vidéo */
+    }
+
+    .mp-status {
+      font: 500 7px/1 'DM Mono', monospace;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(74, 158, 255, 0.32);
+      transition: color 0.3s;
+    }
+
+    .mp-status.active {
+      color: var(--green);
+    }
+
+    .mp-status.error {
+      color: #ef4444;
+    }
+
+    #mp-gesture-label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font: 500 8px/1 'DM Mono', monospace;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: var(--blue-bright);
+      background: rgba(0, 0, 0, 0.58);
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(74, 158, 255, 0.28);
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #mp-gesture-label.triggered {
+      color: var(--green);
+      border-color: rgba(54, 211, 153, 0.40);
+    }
+
+    .player-row {
+      display: flex;
+      gap: 13px;
+      align-items: center;
+      padding: 12px 16px 6px;
+    }
+
+    .album-art {
+      width: 52px;
+      height: 52px;
+      flex-shrink: 0;
+      border-radius: 3px;
+      background: linear-gradient(135deg, #071228 0%, #0D1E40 50%, #071830 100%);
+      border: 1px solid rgba(74, 158, 255, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .album-art::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 30%, rgba(74, 158, 255, 0.22), transparent 60%);
+    }
+
+    .track-name {
+      font: 500 13px/1.3 'DM Sans', sans-serif;
+      color: #fff;
+    }
+
+    .track-desc {
+      font: 400 11px/1.3 'DM Sans', sans-serif;
+      color: rgba(170, 195, 230, 0.65);
+      margin-top: 3px;
+    }
+
+    .track-credit {
+      font: 400 9px/1 'DM Mono', monospace;
+      color: rgba(74, 158, 255, 0.55);
+      margin-top: 5px;
+      letter-spacing: 0.1em;
+    }
+
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+    }
+
+    .prog-time {
+      font: 400 9px/1 'DM Mono', monospace;
+      color: rgba(160, 185, 220, 0.65);
+      white-space: nowrap;
+    }
+
+    .prog-bar {
+      flex: 1;
+      height: 2px;
+      background: rgba(74, 158, 255, 0.10);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .prog-fill {
+      height: 100%;
+      width: 41%;
+      background: var(--blue-bright);
+      border-radius: 2px;
+      opacity: 0.7;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      padding: 4px 16px 14px;
+    }
+
+    .ctrl-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(74, 158, 255, 0.55);
+      font-size: 14px;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+
+    .ctrl-btn:hover {
+      color: var(--blue-bright);
+    }
+
+    .ctrl-btn.play {
+      color: var(--blue-bright);
+      font-size: 16px;
+    }
+
+    /* ── Voice status label (centre, au-dessus de la conv) ─────────── */
+    #voice-status {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 54px;
+      font: 400 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(74, 158, 255, 0.55);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 20;
+      white-space: nowrap;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #voice-status.visible {
+      opacity: 1;
+    }
+
+    /* ── Right: clock ────────────────────────────────────────────── */
+    .clock-wrap {
+      min-height: 250px;
+      padding: 0 16px 20px;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .crush-wm {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font: 500 150px/1 'Landasans', 'Syne', sans-serif;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      background: linear-gradient(180deg,
+          rgba(220, 232, 255, 0.18) 0%,
+          rgba(220, 232, 255, 0.11) 38%,
+          rgba(220, 232, 255, 0.03) 74%,
+          transparent 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .clock-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      line-height: 1;
+      margin-top: 100px;
+    }
+
+    .clock-digits {
+      font: 500 136px/1 'Landasans', 'Syne', sans-serif;
+      color: #fff;
+      letter-spacing: 0.04em;
+      text-shadow: 0 0 28px rgba(255, 255, 255, 0.55), 0 0 70px rgba(255, 255, 255, 0.18);
+    }
+
+    .clock-date {
+      position: relative;
+      z-index: 1;
+      margin-top: 12px;
+      text-align: center;
+      font: 400 13px/1 'DM Mono', monospace;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(170, 205, 255, 0.75);
+    }
+
+    /* ── Right: conversation card ─────────────────────────────────── */
+    .conv-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 0 12px 12px;
+    }
+
+    .conv-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      border: 1px solid rgba(74, 158, 255, 0.18);
+      border-radius: 10px;
+      background: rgba(5, 7, 20, 0.82);
+    }
+
+    .conv-hd {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 16px 10px;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.10);
+      flex-shrink: 0;
+      border-radius: 10px 10px 0 0;
+    }
+
+    .conv-title {
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      color: rgba(100, 168, 255, 0.80);
+    }
+
+    .conv-live {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: auto;
+      font: 400 8px/1 'DM Mono', monospace;
+      color: var(--green);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .conv-timer {
+      font: 400 8px/1 'DM Mono', monospace;
+      color: rgba(130, 160, 200, 0.5);
+      letter-spacing: 0.08em;
+    }
+
+    .conv-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(74, 158, 255, 0.1) transparent;
+    }
+
+    .conv-messages::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .conv-messages::-webkit-scrollbar-thumb {
+      background: rgba(74, 158, 255, 0.12);
+      border-radius: 2px;
+    }
+
+    .conv-msg {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.07);
+    }
+
+    .conv-msg:last-child {
+      border-bottom: none;
+    }
+
+    .conv-msg-hd {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .conv-from {
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .conv-from.crush {
+      color: var(--blue-bright);
+    }
+
+    .conv-from.vous {
+      color: rgba(160, 185, 220, 0.65);
+    }
+
+    .conv-msg-time {
+      font: 400 8px/1 'DM Mono', monospace;
+      color: rgba(120, 150, 195, 0.45);
+    }
+
+    .conv-msg-text {
+      font: 400 12.5px/1.65 'DM Sans', sans-serif;
+      color: #fff;
+      word-break: break-word;
+    }
+
+    .conv-msg-text.streaming::after {
+      content: '▋';
+      display: inline-block;
+      animation: blink 0.7s step-start infinite;
+      color: var(--blue-bright);
+      font-size: 10px;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .conv-input-wrap {
+      border-top: 1px solid rgba(74, 158, 255, 0.09);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .conv-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font: 400 12px/1.4 'DM Sans', sans-serif;
+      color: #fff;
+      padding: 4px 0;
+      caret-color: var(--blue-bright);
+    }
+
+    .conv-input::placeholder {
+      color: rgba(130, 160, 200, 0.4);
+      font-style: italic;
+    }
+
+    .conv-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(74, 158, 255, 0.45);
+      font-size: 14px;
+      padding: 4px 6px;
+      transition: color 0.2s;
+      border-radius: 6px;
+      line-height: 1;
+    }
+
+    .conv-btn:hover {
+      color: var(--blue-bright);
+    }
+
+    .conv-btn.send {
+      background: rgba(74, 158, 255, 0.10);
+      color: rgba(74, 158, 255, 0.6);
+      font-size: 15px;
+      padding: 6px 13px;
+      font-weight: 500;
+      border-radius: 6px;
+    }
+
+    .conv-btn.send:hover {
+      background: rgba(74, 158, 255, 0.18);
+      color: var(--blue-bright);
+    }
+
+    .conv-btn.mic-active {
+      color: #ef4444 !important;
+    }
+
+    /* ── Notification / reminder pills in chat ───────────────────── */
+    .conv-msg.notif {
+      border-left: 2px solid var(--green);
+      background: rgba(54, 211, 153, 0.04);
+      padding-left: 14px;
+    }
+
+    .conv-msg.notif .conv-from {
+      color: var(--green) !important;
+    }
+
+    .conv-msg.notif .conv-msg-text {
+      color: rgba(180, 245, 215, 0.92);
+    }
+
+    /* ── Status bar — outside the card ───────────────────────────── */
+    .status-bar {
+      padding: 6px 4px 7px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-shrink: 0;
+      justify-content: space-between;
+      border: 1px solid rgba(74, 158, 255, 0.16);
+      border-radius: 8px;
+      background: rgba(5, 7, 20, 0.72);
+      margin-bottom: 2px;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      justify-content: center;
+      font: 500 8.5px/1 'DM Mono', monospace;
+      color: rgba(185, 215, 250, 0.88);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .stat-item+.stat-item {
+      border-left: 1px solid rgba(74, 158, 255, 0.12);
+    }
+
+    .stat-item .dot {
+      background: var(--green);
+      width: 5px;
+      height: 5px;
+      box-shadow: 0 0 5px rgba(54, 211, 153, 0.55);
+    }
+
+    /* ── Spotify ─────────────────────────────────────────────────── */
+    .spotify-badge {
+      font: 500 8px/1 'DM Mono', monospace;
+      letter-spacing: 0.2em;
+      color: #1DB954;
+      background: rgba(29, 185, 84, 0.12);
+      padding: 3px 7px;
+      border-radius: 3px;
+    }
+
+    .spotify-connect-btn {
+      font: 400 11px/1 'DM Sans', sans-serif;
+      color: #1DB954;
+      text-decoration: none;
+      opacity: 0.85;
+      transition: opacity 0.2s;
+    }
+
+    .spotify-connect-btn:hover {
+      opacity: 1;
+    }
+
+    /* ── Widget loading ──────────────────────────────────────────── */
+    .ev-loading {
+      padding: 10px 16px;
+      font: 400 11px/1 'DM Mono', monospace;
+      color: rgba(74, 158, 255, 0.35);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Session switcher ────────────────────────────────────────── */
+    .session-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0;
+      color: rgba(100, 168, 255, 0.80);
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      transition: color 0.15s;
+    }
+
+    .session-btn:hover {
+      color: var(--blue-bright);
+    }
+
+    .session-btn svg {
+      transition: transform 0.18s;
+    }
+
+    .session-btn.open svg {
+      transform: rotate(180deg);
+    }
+
+    .session-sub {
+      font: 400 8px/1 'DM Mono', monospace;
+      letter-spacing: 0.12em;
+      color: rgba(74, 158, 255, 0.42);
+      text-transform: none;
+      max-width: 160px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .session-drop {
+      position: fixed;
+      background: rgba(5, 8, 22, 0.97);
+      border: 1px solid rgba(74, 158, 255, 0.22);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      z-index: 200;
+      overflow: hidden;
+      backdrop-filter: blur(18px);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.70);
+    }
+
+    .sdrop-new {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 16px 10px 14px;
+      font: 500 8.5px/1 'DM Mono', monospace;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: var(--green);
+      background: none;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.08);
+      transition: background 0.12s;
+    }
+
+    .sdrop-new:hover {
+      background: rgba(54, 211, 153, 0.06);
+    }
+
+    .sdrop-plus {
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1px solid rgba(54, 211, 153, 0.40);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      flex-shrink: 0;
+      color: var(--green);
+    }
+
+    .sdrop-list {
+      max-height: 210px;
+      overflow-y: auto;
+    }
+
+    .sdrop-list::-webkit-scrollbar {
+      width: 2px;
+    }
+
+    .sdrop-list::-webkit-scrollbar-thumb {
+      background: rgba(74, 158, 255, 0.10);
+    }
+
+    .sdrop-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 8px 14px;
+      width: 100%;
+      border: none;
+      background: none;
+      cursor: pointer;
+      text-align: left;
+      border-bottom: 1px solid rgba(74, 158, 255, 0.06);
+      transition: background 0.12s;
+    }
+
+    .sdrop-item:hover {
+      background: rgba(74, 158, 255, 0.05);
+    }
+
+    .sdrop-item.active {
+      background: rgba(74, 158, 255, 0.08);
+    }
+
+    .sdrop-item:last-child {
+      border-bottom: none;
+    }
+
+    .sdrop-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+      background: rgba(74, 158, 255, 0.18);
+    }
+
+    .sdrop-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 5px rgba(54, 211, 153, 0.55);
+    }
+
+    .sdrop-preview {
+      font: 400 11.5px/1.3 'DM Sans', sans-serif;
+      color: rgba(210, 228, 255, 0.80);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sdrop-item.active .sdrop-preview {
+      color: #fff;
+    }
+
+    .sdrop-meta {
+      font: 400 8px/1 'DM Mono', monospace;
+      color: rgba(90, 130, 190, 0.45);
+      margin-top: 3px;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Projects / Missions ─────────────────────────────────────── */
+    .missions {
+      padding: 4px 12px 8px;
+    }
+
+    .proj-card {
+      padding: 9px 10px 8px;
+      border: 1px solid rgba(74, 158, 255, 0.12);
+      border-radius: 7px;
+      background: rgba(5, 7, 20, 0.55);
+      margin-bottom: 6px;
+    }
+
+    .proj-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .proj-row1 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+
+    .proj-title {
+      flex: 1;
+      font: 500 12px/1.3 'DM Sans', sans-serif;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .proj-badge {
+      font: 500 7px/1 'DM Mono', monospace;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 99px;
+      border: 1px solid;
+      flex-shrink: 0;
+    }
+
+    .proj-badge.running {
+      color: var(--blue-bright);
+      border-color: rgba(74, 158, 255, 0.35);
+      background: rgba(74, 158, 255, 0.10);
+    }
+
+    .proj-badge.done {
+      color: var(--green);
+      border-color: rgba(54, 211, 153, 0.35);
+      background: rgba(54, 211, 153, 0.10);
+    }
+
+    .proj-badge.failed {
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.10);
+    }
+
+    .proj-badge.killed {
+      color: rgba(150, 170, 200, 0.6);
+      border-color: rgba(150, 170, 200, 0.2);
+      background: rgba(150, 170, 200, 0.06);
+    }
+
+    .proj-badge.planning {
+      color: var(--gold);
+      border-color: rgba(184, 150, 62, 0.35);
+      background: rgba(184, 150, 62, 0.10);
+    }
+
+    .proj-kill {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(239, 68, 68, 0.35);
+      font-size: 11px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .proj-kill:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    .proj-row2 {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .proj-prog-bar {
+      flex: 1;
+      height: 2px;
+      background: rgba(74, 158, 255, 0.10);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .proj-prog-fill {
+      height: 100%;
+      background: var(--blue-bright);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .proj-prog-fill.done {
+      background: var(--green);
+    }
+
+    .proj-prog-fill.failed {
+      background: #ef4444;
+    }
+
+    .proj-steps {
+      font: 400 9px/1 'DM Mono', monospace;
+      color: rgba(120, 150, 200, 0.55);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── Mindmap modal ───────────────────────────────────────────── */
+    #mindmap-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(4, 6, 16, 0.88);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #mindmap-modal.open {
+      display: flex;
+      animation: fadeIn .18s ease;
+    }
+
+    #mindmap-container {
+      position: relative;
+      background: rgba(8, 12, 28, 0.97);
+      border: 1px solid rgba(74, 158, 255, 0.22);
+      border-radius: 14px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(74, 158, 255, 0.08);
+      padding: 24px;
+      width: 92vw;
+      height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #mindmap-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    #mindmap-toolbar span {
+      font: 700 10px/1 'DM Mono', monospace;
+      letter-spacing: .12em;
+      color: rgba(74, 158, 255, 0.6);
+    }
+
+    #mindmap-toolbar-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mindmap-btn {
+      background: rgba(74, 158, 255, 0.08);
+      border: 1px solid rgba(74, 158, 255, 0.20);
+      border-radius: 6px;
+      color: rgba(74, 158, 255, 0.8);
+      font: 500 11px/1 'DM Sans', sans-serif;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .mindmap-btn:hover {
+      background: rgba(74, 158, 255, 0.16);
+    }
+
+    .mindmap-btn.close {
+      color: rgba(220, 232, 255, 0.4);
+    }
+
+    #mindmap-render {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #mindmap-render svg {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
+    }
+
+    /* ── Approval modal ──────────────────────────────────────────── */
+    #approval-modal {
+      position: fixed;
+      z-index: 60;
+      bottom: 48px;
+      left: 316px;
+      width: 340px;
+      border: 1px solid rgba(184, 150, 62, 0.45);
+      border-radius: 10px;
+      background: rgba(8, 10, 24, 0.96);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(184, 150, 62, 0.10);
+      padding: 14px 16px 12px;
+      display: none;
+      animation: fadeUp 0.2s ease;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .approval-hd {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 8px;
+    }
+
+    .approval-icon {
+      font-size: 14px;
+    }
+
+    .approval-label {
+      font: 500 8px/1 'DM Mono', monospace;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gold);
+      flex: 1;
+    }
+
+    .approval-title {
+      font: 400 11px/1.4 'DM Sans', sans-serif;
+      color: rgba(220, 232, 255, 0.85);
+      margin-bottom: 11px;
+    }
+
+    .approval-desc {
+      font: 400 11px/1.5 'DM Sans', sans-serif;
+      color: rgba(170, 195, 230, 0.70);
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border: 1px solid rgba(74, 158, 255, 0.10);
+      border-radius: 6px;
+      background: rgba(74, 158, 255, 0.04);
+    }
+
+    .approval-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .approval-btn {
+      flex: 1;
+      border: 1px solid;
+      border-radius: 99px;
+      padding: 7px 12px;
+      font: 500 9px/1 'DM Mono', monospace;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .approval-btn.approve {
+      background: rgba(54, 211, 153, 0.10);
+      border-color: rgba(54, 211, 153, 0.35);
+      color: var(--green);
+    }
+
+    .approval-btn.approve:hover {
+      background: rgba(54, 211, 153, 0.20);
+    }
+
+    .approval-btn.reject {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.28);
+      color: #ef4444;
+    }
+
+    .approval-btn.reject:hover {
+      background: rgba(239, 68, 68, 0.16);
+    }
+
+    /* ── Ticker ───────────────────────────────────────────────────── */
+    .ticker {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 28px;
+      background: rgba(6, 8, 18, 0.92);
+      border-top: 1px solid var(--sep);
+      z-index: 20;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+    .ticker-track {
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      animation: ticker-scroll 50s linear infinite;
+      font: 400 9.5px/1 'DM Mono', monospace;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(58, 69, 88, 0.5);
+    }
+
+    .ticker-dot {
+      color: rgba(74, 158, 255, 0.4);
+      padding: 0 14px;
+    }
+
+    @keyframes ticker-scroll {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(-50%);
+      }
+    }
+
+    /* ── Panels toggle ──────────────────────────────────────────── */
+    #panels-toggle {
+      position: fixed;
+      left: 292px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 200;
+      background: rgba(6, 8, 13, 0.7);
+      border: 1px solid rgba(74, 158, 255, 0.12);
+      border-radius: 0 4px 4px 0;
+      color: rgba(220, 232, 255, 0.25);
+      width: 16px;
+      height: 48px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+    }
+
+    #panels-toggle:hover {
+      color: rgba(220, 232, 255, 0.7);
+      border-color: rgba(74, 158, 255, 0.3);
+      background: rgba(6, 8, 13, 0.9);
+    }
+
+    #panels-toggle svg {
+      transition: transform 300ms ease;
+    }
+
+    #panels-toggle.hidden-state svg {
+      transform: rotate(180deg);
+    }
+
+    /* ── Mapbox attribution tweaks ───────────────────────────────── */
+    .mapboxgl-ctrl-bottom-right {
+      bottom: 36px !important;
+    }
+
+    /* ── GSAP view transition overlay ──────────────────────────── */
+    #transition-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 1;
+      background: #000;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="transition-overlay"></div>
+
+  <svg width="0" height="0" style="position:absolute;overflow:hidden">
+    <defs>
+      <filter id="grain-filter" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+    </defs>
+  </svg>
+
+  <canvas id="three-canvas"></canvas>
+  <div id="globe-container"></div>
+
+  <button id="panels-toggle" title="Masquer les panneaux">
+    <svg width="12" height="24" viewBox="0 0 12 24">
+      <polyline points="10,4 2,12 10,20" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" />
+    </svg>
+  </button>
+
+  <!-- Nav buttons — 5 boutons centrés, ordre : Crush · Pilotage · Globe · Intel · Système -->
+  <button id="crush-toggle" onclick="handleSphereClick()" title="">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" />
+      <circle cx="7.5" cy="9" r="1" fill="currentColor" stroke="none" />
+      <circle cx="16.5" cy="9" r="1" fill="currentColor" stroke="none" />
+      <circle cx="7.5" cy="15" r="1" fill="currentColor" stroke="none" />
+      <circle cx="16.5" cy="15" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  </button>
+  <button id="dashboard-nav-btn" onclick="handleDashboardClick()" title="Pilotage">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  </button>
+  <button id="globe-toggle" onclick="handleGlobeClick()" title="Globe mondial">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  </button>
+  <button id="intel-toggle" onclick="handleIntelClick()" title="Intel Monde">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M13 2L4.09 13H11L10 22L19.91 11H13V2Z" />
+    </svg>
+  </button>
+  <button id="settings-nav-btn" onclick="handleSettingsClick()" title="Système">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  </button>
+
+  <!-- Globe legend -->
+  <div id="globe-legend">
+    <div class="globe-legend-item">
+      <span class="dot" style="background:#4A9EFF"></span>
+      <span>Vols <span class="globe-legend-count" id="flight-count">—</span></span>
+      <button class="layer-toggle active" data-layer="flights">●</button>
+    </div>
+    <div class="globe-legend-item">
+      <span class="dot" style="background:#B8963E"></span>
+      <span>Navires <span class="globe-legend-count" id="vessel-count">—</span></span>
+      <button class="layer-toggle active" data-layer="vessels">●</button>
+    </div>
+    <div class="globe-legend-item">
+      <span class="dot" style="background:#36D399"></span>
+      <span>Météo <span class="globe-legend-count" id="weather-count">—</span></span>
+      <button class="layer-toggle active" data-layer="weather">●</button>
+    </div>
+    <div class="globe-legend-separator"></div>
+    <div class="globe-legend-hint">Glisser · Molette zoom</div>
+  </div>
+
+  <!-- Globe tooltip -->
+  <div id="globe-tooltip"></div>
+
+  <!-- SPA Panel — Dashboard & Settings inline -->
+  <div id="spa-panel">
+    <div id="spa-aurora"></div>
+    <div class="app">
+      <aside id="sidebar"></aside>
+      <main class="main">
+        <header id="topbar"></header>
+        <div id="page-root"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Intel Monde — iframe plein écran -->
+  <div id="intel-overlay">
+    <iframe id="intel-iframe" src="" title="Intel Monde"></iframe>
+    <div id="intel-fallback">
+      <div class="intel-fallback-inner">
+        <div class="intel-fallback-title">Dashboard Géopolitique Mondial</div>
+        <p class="intel-fallback-sub">Le service Intel n'est pas disponible sur <code>localhost:3000</code></p>
+        <div class="intel-fallback-steps">
+          <p>Pour y avoir accès :</p>
+          <ol>
+            <li>Cloner le dépôt :<br><code>git clone https://github.com/Grominet95/dashboard_monde.git</code></li>
+            <li>Installer les dépendances : <code>npm install</code></li>
+            <li>Lancer le serveur : <code>npm run dev -- --port 3000</code></li>
+            <li>Revenir ici — <span id="assistant-name-helper"></span> l'affichera automatiquement</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings — iframe plein écran -->
+  <div id="settings-overlay">
+    <iframe id="settings-iframe" src="" title="Paramètres"></iframe>
+  </div>
+
+
+  <!-- intel-nav-hub supprimé — les boutons de la nav principale restent visibles en mode Intel -->
+
+  <div class="grain"></div>
+  <div class="vignette"></div>
+  <div id="aurora-bg"></div>
+
+  <div class="layout" id="main-layout">
+
+    <!-- ══ LEFT PANEL ══════════════════════════════════════════ -->
+    <aside class="panel-left" id="panel-left">
+
+      <div class="brand">
+        <div class="brand-name">CRUSH</div>
+        <div class="brand-status"><span class="dot"></span>EN LIGNE</div>
+      </div>
+
+      <!-- Scrollable: events + tasks -->
+      <div class="left-scroll">
+
+        <!-- Events -->
+        <div class="section">
+          <div class="section-hd">
+            <span class="section-label">Événements à venir</span>
+            <span class="section-badge" id="events-badge">—</span>
+          </div>
+          <div class="events" id="events-list">
+            <div class="ev-loading">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div class="section">
+          <div class="section-hd">
+            <span class="section-label">Tâches du jour</span>
+            <span class="section-badge" id="tasks-badge">—</span>
+          </div>
+          <div class="tasks" id="tasks-list">
+            <div class="ev-loading">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Missions -->
+        <div class="section" id="missions-section" style="display:none">
+          <div class="section-hd">
+            <span class="section-label">Missions actives</span>
+            <span class="section-badge" id="missions-badge">0</span>
+          </div>
+          <div class="missions" id="missions-list"></div>
+        </div>
+
+      </div><!-- /left-scroll -->
+
+      <!-- Globe mode: data panel (remplace left-scroll) -->
+      <div id="globe-data-panel">
+
+        <!-- Header -->
+        <div class="gdp-header">
+          <span class="gdp-title">Globe Temps Réel</span>
+          <div class="gdp-live">
+            <span class="pulse-dot"></span>
+            <span>En direct</span>
+          </div>
+        </div>
+
+        <!-- Vols — toggle switch + recherche callsign -->
+        <div class="gdp-section">
+          <div class="gdp-section-hd">
+            <span class="gdp-section-dot" style="background:#4A9EFF"></span>
+            <span class="gdp-section-label">Vols en direct</span>
+            <span class="gdp-section-count" id="gdp-flight-count">—</span>
+            <label class="gdp-switch" title="Afficher / masquer les vols">
+              <input type="checkbox" id="gdp-flights-check" onchange="Globe.toggleLayer('flights')">
+              <span class="gdp-switch-track"></span>
+            </label>
+          </div>
+          <div class="gdp-search-row">
+            <input id="gdp-flight-search" class="gdp-search-input" type="text" placeholder="N° de vol — ex: AF447"
+              oninput="Globe.searchFlight(this.value)" autocomplete="off" spellcheck="false">
+            <button class="gdp-search-clear"
+              onclick="document.getElementById('gdp-flight-search').value=''; Globe.searchFlight('')"
+              title="Effacer">✕</button>
+          </div>
+        </div>
+
+        <!-- Météo -->
+        <div class="gdp-section">
+          <div class="gdp-section-hd">
+            <span class="gdp-section-dot" style="background:#A78BFA"></span>
+            <span class="gdp-section-label">Météo</span>
+            <span class="gdp-section-count" id="gdp-weather-count">4 villes</span>
+            <button class="gdp-section-toggle active" data-layer="weather">●</button>
+          </div>
+          <div class="gdp-weather-grid" id="gdp-weather-grid">
+            <div class="gdp-weather-cell">
+              <div class="gdp-weather-city">Paris</div>
+              <div class="gdp-weather-temp" id="gdp-w-paris-temp">—°</div>
+              <div class="gdp-weather-desc" id="gdp-w-paris-desc">Chargement</div>
+            </div>
+            <div class="gdp-weather-cell">
+              <div class="gdp-weather-city">New York</div>
+              <div class="gdp-weather-temp" id="gdp-w-nyc-temp">—°</div>
+              <div class="gdp-weather-desc" id="gdp-w-nyc-desc">Chargement</div>
+            </div>
+            <div class="gdp-weather-cell">
+              <div class="gdp-weather-city">Tokyo</div>
+              <div class="gdp-weather-temp" id="gdp-w-tokyo-temp">—°</div>
+              <div class="gdp-weather-desc" id="gdp-w-tokyo-desc">Chargement</div>
+            </div>
+            <div class="gdp-weather-cell">
+              <div class="gdp-weather-city">Dubai</div>
+              <div class="gdp-weather-temp" id="gdp-w-dubai-temp">—°</div>
+              <div class="gdp-weather-desc" id="gdp-w-dubai-desc">Chargement</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /globe-data-panel -->
+
+      <!-- Musique (compact, fixed au bas) -->
+      <div class="section focus">
+        <div class="section-hd">
+          <span class="section-label">En cours</span>
+          <span class="spotify-badge" id="music-badge">MUSIQUE</span>
+        </div>
+        <div id="music-no-provider" style="display:none;padding:12px 16px 14px">
+          <a href="#" onclick="document.getElementById('settings-nav-btn')?.click();window._pendingSettingsSection='musique';return false;" class="spotify-connect-btn">Choisir un fournisseur de musique →</a>
+        </div>
+        <div id="spotify-disconnected" style="display:none;padding:12px 16px 14px">
+          <a href="/api/spotify/auth" class="spotify-connect-btn">Connecter Spotify →</a>
+        </div>
+        <div id="spotify-player">
+          <div class="player-row">
+            <div class="album-art" id="album-art-wrap">
+              <img id="album-art-img" src="" alt=""
+                style="width:100%;height:100%;object-fit:cover;display:none;border-radius:2px;">
+            </div>
+            <div style="min-width:0">
+              <div class="track-name" id="spotify-track">—</div>
+              <div class="track-desc" id="spotify-artist">—</div>
+              <div class="track-credit" id="spotify-album"></div>
+            </div>
+          </div>
+          <div class="progress-row">
+            <span class="prog-time" id="prog-cur">0:00</span>
+            <div class="prog-bar">
+              <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+            </div>
+            <span class="prog-time" id="prog-dur">0:00</span>
+          </div>
+          <div class="controls-row">
+            <button class="ctrl-btn" id="sp-prev" onclick="spotifyAction('previous')" title="Précédent">
+              <svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.3"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12,1 4.5,5.5 12,10" fill="currentColor" stroke="none" />
+                <line x1="1" y1="1" x2="1" y2="10" />
+              </svg>
+            </button>
+            <button class="ctrl-btn play" id="sp-play" onclick="spotifyToggle()" title="Lecture / Pause">
+              <svg id="sp-play-svg" width="12" height="13" viewBox="0 0 12 13" fill="currentColor">
+                <polygon points="1,1 11,6.5 1,12" />
+              </svg>
+            </button>
+            <button class="ctrl-btn" id="sp-next" onclick="spotifyAction('next')" title="Suivant">
+              <svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.3"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="1,1 8.5,5.5 1,10" fill="currentColor" stroke="none" />
+                <line x1="12" y1="1" x2="12" y2="10" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Permissions -->
+      <div class="section perms-section">
+        <div class="section-hd">
+          <span class="section-label">Accès</span>
+        </div>
+        <div class="perms-grid">
+
+          <button class="perm-btn" id="perm-microphone" onclick="togglePerm('microphone')" title="Micro — mode vocal">
+            <svg width="14" height="19" viewBox="0 0 14 19" fill="none" stroke="currentColor" stroke-width="1.35"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3.5" y="1" width="7" height="10" rx="3.5" />
+              <path d="M1 9c0 3.3 2.7 6 6 6s6-2.7 6-6" />
+              <line x1="7" y1="15" x2="7" y2="18" />
+              <line x1="4" y1="18" x2="10" y2="18" />
+            </svg>
+            <span class="perm-label">Micro</span>
+          </button>
+
+          <button class="perm-btn active" id="perm-screen" onclick="togglePerm('screen')" title="Capture d'écran">
+            <svg width="18" height="15" viewBox="0 0 18 15" fill="none" stroke="currentColor" stroke-width="1.35"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="1" width="16" height="10" rx="2" />
+              <line x1="5.5" y1="14" x2="12.5" y2="14" />
+              <line x1="9" y1="11" x2="9" y2="14" />
+            </svg>
+            <span class="perm-label">Écran</span>
+          </button>
+
+          <button class="perm-btn active" id="perm-camera" onclick="togglePerm('camera')" title="Caméra">
+            <svg width="18" height="14" viewBox="0 0 18 14" fill="none" stroke="currentColor" stroke-width="1.35"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M1 4H2.4L3.8 2H14.2L15.6 4H17C17.6 4 18 4.4 18 5V12C18 12.6 17.6 13 17 13H1C0.4 13 0 12.6 0 12V5C0 4.4 0.4 4 1 4Z" />
+              <circle cx="9" cy="8.5" r="2.7" />
+            </svg>
+            <span class="perm-label">Caméra</span>
+          </button>
+
+          <button class="perm-btn active" id="perm-files" onclick="togglePerm('files')" title="Accès fichiers">
+            <svg width="18" height="15" viewBox="0 0 18 15" fill="none" stroke="currentColor" stroke-width="1.35"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M1 3.5C1 2.9 1.4 2.5 2 2.5H6L8 4.5H16C16.6 4.5 17 4.9 17 5.5V12.5C17 13.1 16.6 13.5 16 13.5H2C1.4 13.5 1 13.1 1 12.5V3.5Z" />
+            </svg>
+            <span class="perm-label">Fichiers</span>
+          </button>
+
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ══ CENTER (transparent, sphere shows through) ══════════ -->
+    <div class="panel-center"></div>
+
+    <!-- ══ RIGHT PANEL ═════════════════════════════════════════ -->
+    <aside class="panel-right" id="panel-right">
+
+      <!-- Clock -->
+      <div class="clock-wrap">
+        <div class="crush-wm">CRUSH</div>
+        <div class="clock-row">
+          <div class="clock-digits" id="clock-hm">09:23</div>
+        </div>
+        <div class="clock-date" id="clock-date">VENDREDI, 25 AVRIL 2025</div>
+      </div>
+
+      <!-- Conversation -->
+      <div class="conv-wrap">
+        <div class="conv-card">
+          <div class="conv-hd" id="conv-hd">
+            <button class="session-btn" id="session-btn" onclick="toggleSessionDrop()">
+              <span>SESSION</span>
+              <span class="session-sub" id="session-label">NOUVEAU</span>
+              <svg width="8" height="5" viewBox="0 0 8 5" fill="none" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1,1 4,4 7,1" />
+              </svg>
+            </button>
+            <span class="conv-live" style="margin-left:auto"><span class="dot" id="ws-dot"
+                style="background:var(--text-dim)"></span>EN DIRECT</span>
+          </div>
+
+          <div class="conv-messages" id="chat"></div>
+
+          <div class="conv-input-wrap">
+            <input class="conv-input" id="msg-input" placeholder="" autocomplete="off">
+            <button class="conv-btn send" id="send-btn">›</button>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <div class="stat-item"><span class="dot"></span>CPU 18%</div>
+          <div class="stat-item">MEM 32%</div>
+          <div class="stat-item"><span class="dot"></span>SÉCURISÉ</div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- Camera floating window -->
+  <div id="cam-win" class="cam-win" style="display:none;">
+    <div class="cam-win-hd" id="cam-drag-handle">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="cam-win-title">Caméra</span>
+        <span id="mp-status" class="mp-status"></span>
+      </div>
+      <div class="cam-win-btns">
+        <button class="cam-ctrl-btn" onclick="camToggleMinimize()" title="Réduire">
+          <svg width="10" height="2" viewBox="0 0 10 2" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round">
+            <line x1="0.5" y1="1" x2="9.5" y2="1" />
+          </svg>
+        </button>
+        <button class="cam-ctrl-btn" onclick="camCloseBtn()" title="Fermer">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round">
+            <line x1="1" y1="1" x2="9" y2="9" />
+            <line x1="9" y1="1" x2="1" y2="9" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="cam-body" id="cam-body">
+      <video id="cam-video" autoplay muted playsinline></video>
+      <canvas id="cam-canvas"></canvas>
+      <div class="cam-live-pill"><span class="dot"></span>LIVE</div>
+      <div id="mp-gesture-label"></div>
+    </div>
+  </div>
+
+  <!-- Session dropdown (body-level pour éviter overflow:hidden parents) -->
+  <div class="session-drop" id="session-drop" style="display:none">
+    <button class="sdrop-new" onclick="newSession()">
+      <span class="sdrop-plus">+</span>
+      Nouvelle session
+    </button>
+    <div class="sdrop-list" id="sdrop-list">
+      <div
+        style="padding:10px 14px;font:400 10px/1 'DM Mono',monospace;color:rgba(74,158,255,0.30);letter-spacing:.1em">
+        Chargement…</div>
+    </div>
+  </div>
+
+  <!-- Approval modal -->
+  <div id="approval-modal">
+    <div class="approval-hd">
+      <span class="approval-icon">⚡</span>
+      <span class="approval-label">Approbation requise</span>
+    </div>
+    <div class="approval-title" id="approval-project-title"></div>
+    <div class="approval-desc" id="approval-step-desc"></div>
+    <div class="approval-btns">
+      <button class="approval-btn approve" onclick="resolveApproval(true)">Approuver ✓</button>
+      <button class="approval-btn reject" onclick="resolveApproval(false)">Rejeter ✗</button>
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker">
+    <div class="ticker-track">
+      <span>● CRUSH ACTIF</span><span class="ticker-dot">·</span>
+      <span>Tâches synchronisées</span><span class="ticker-dot">·</span>
+      <span>Run endurance dans 3h45</span><span class="ticker-dot">·</span>
+      <span>Mémoire : 12 topics</span><span class="ticker-dot">·</span>
+      <span>CPU 18%</span><span class="ticker-dot">·</span>
+      <span>MEM 32%</span><span class="ticker-dot">·</span>
+      <span>Aucune alerte active</span><span class="ticker-dot">·</span>
+      <span>● CRUSH ACTIF</span><span class="ticker-dot">·</span>
+      <span>Tâches synchronisées</span><span class="ticker-dot">·</span>
+      <span>Run endurance dans 3h45</span><span class="ticker-dot">·</span>
+      <span>Mémoire : 12 topics</span><span class="ticker-dot">·</span>
+      <span>CPU 18%</span><span class="ticker-dot">·</span>
+      <span>MEM 32%</span><span class="ticker-dot">·</span>
+      <span>Aucune alerte active</span><span class="ticker-dot">·</span>
+    </div>
+  </div>
+
+  <!-- Voice status label (VAD / STT / LLM feedback) -->
+  <div id="voice-status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="/globe.js"></script>
+  <script>
+    'use strict';
+
+    // ══════════════════════════════════════════════════════════════
+    //  THREE.JS SPHERE — Dense particles + directional light + mouse spring
+    // ══════════════════════════════════════════════════════════════
+    const canvas = document.getElementById('three-canvas');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x06080D, 1);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 1, 4000);
+    camera.position.set(0, 0, 640);
+
+    // ── Textures ──────────────────────────────────────────────────
+    function makeParticleTex(size) {
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.28, 'rgba(255,255,255,0.88)');
+      g.addColorStop(0.55, 'rgba(180,210,255,0.22)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    }
+    function makeGlowTex(size) {
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0, 'rgba(74,158,255,0.50)');
+      g.addColorStop(0.40, 'rgba(50,120,210,0.15)');
+      g.addColorStop(0.75, 'rgba(30, 80,160,0.04)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const PT = makeParticleTex(32);
+    const GT = makeGlowTex(512);
+    const GT2 = makeGlowTex(256);
+
+    // ── Background halo ───────────────────────────────────────────
+    const bgGlowMat = new THREE.SpriteMaterial({
+      map: GT, color: new THREE.Color(0x4A9EFF),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.68,
+    });
+    const bgGlow = new THREE.Sprite(bgGlowMat);
+    bgGlow.scale.set(820, 820, 1); bgGlow.position.z = -160;
+    scene.add(bgGlow);
+
+    // Gold glow — THINKING state
+    const goldMat = new THREE.SpriteMaterial({
+      map: GT2, color: new THREE.Color(0xC89030),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
+    });
+    const goldGlow = new THREE.Sprite(goldMat);
+    goldGlow.scale.set(380, 380, 1);
+    scene.add(goldGlow);
+
+    const sphereGroup = new THREE.Group();
+    scene.add(sphereGroup);
+
+    // ── Two-tier Fibonacci sphere ─────────────────────────────────
+    const R = 150;
+    const N_SM = 12000;  // small dense particles
+    const N_BG = 3000;   // larger sparkle particles
+
+    function fibSphere(n, radius) {
+      const pos = new Float32Array(n * 3);
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < n; i++) {
+        const y = 1 - (i / (n - 1)) * 2;
+        const rho = Math.sqrt(Math.max(0, 1 - y * y));
+        const th = golden * i;
+        pos[i * 3] = Math.cos(th) * rho * radius;
+        pos[i * 3 + 1] = y * radius;
+        pos[i * 3 + 2] = Math.sin(th) * rho * radius;
+      }
+      return pos;
+    }
+
+    const baseSM = fibSphere(N_SM, R);
+    const baseBG = fibSphere(N_BG, R);
+    const curSM = baseSM.slice();
+    const curBG = baseBG.slice();
+    const velSM = new Float32Array(N_SM * 3);
+    const velBG = new Float32Array(N_BG * 3);
+    const phaseSM = Float32Array.from({ length: N_SM }, () => Math.random() * Math.PI * 2);
+    const phaseBG = Float32Array.from({ length: N_BG }, () => Math.random() * Math.PI * 2);
+
+    // ── Vertex colors — Lambertian shading ────────────────────────
+    const colSM = new Float32Array(N_SM * 3);
+    const colBG = new Float32Array(N_BG * 3);
+
+    function recomputeColors(base, col, N, Lx, Ly, Lz, litR, litG, litB, shadR, shadG, shadB) {
+      for (let i = 0; i < N; i++) {
+        const nx = base[i * 3] / R, ny = base[i * 3 + 1] / R, nz = base[i * 3 + 2] / R;
+        const lit = Math.max(0, nx * Lx + ny * Ly + nz * Lz);
+        col[i * 3] = shadR + (litR - shadR) * lit;
+        col[i * 3 + 1] = shadG + (litG - shadG) * lit;
+        col[i * 3 + 2] = shadB + (litB - shadB) * lit;
+      }
+    }
+
+    // ── Geometries ─────────────────────────────────────────────────
+    const geoSM = new THREE.BufferGeometry();
+    const attrPosSM = new THREE.BufferAttribute(curSM, 3);
+    const attrColSM = new THREE.BufferAttribute(colSM, 3);
+    geoSM.setAttribute('position', attrPosSM);
+    geoSM.setAttribute('color', attrColSM);
+
+    const geoBG = new THREE.BufferGeometry();
+    const attrPosBG = new THREE.BufferAttribute(curBG, 3);
+    const attrColBG = new THREE.BufferAttribute(colBG, 3);
+    geoBG.setAttribute('position', attrPosBG);
+    geoBG.setAttribute('color', attrColBG);
+
+    const matSM = new THREE.PointsMaterial({
+      size: 3.5, map: PT, vertexColors: true,
+      transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, sizeAttenuation: true, opacity: 0.95,
+    });
+    const matBG = new THREE.PointsMaterial({
+      size: 8.5, map: PT, vertexColors: true,
+      transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, sizeAttenuation: true, opacity: 0.75,
+    });
+
+    sphereGroup.add(new THREE.Points(geoSM, matSM));
+    sphereGroup.add(new THREE.Points(geoBG, matBG));
+
+    // ── State configs ─────────────────────────────────────────────
+    const STATES = {
+      IDLE: { Lx: -0.50, Ly: 0.68, Lz: 0.54, litR: 1.00, litG: 1.00, litB: 1.00, shadR: 0.25, shadG: 0.42, shadB: 0.74, rotY: 0.0018, bAmp: 0.010, bFreq: 0.38, wAmp: 0.004, wFreq: 0.20, goldOp: 0, bgCol: 0x4A9EFF, bgOp: 0.65 },
+      LISTENING: { Lx: -0.42, Ly: 0.78, Lz: 0.42, litR: 0.95, litG: 0.98, litB: 1.00, shadR: 0.20, shadG: 0.34, shadB: 0.64, rotY: 0.0038, bAmp: 0.024, bFreq: 1.80, wAmp: 0.011, wFreq: 0.65, goldOp: 0, bgCol: 0x4A9EFF, bgOp: 0.80 },
+      THINKING: { Lx: 0.48, Ly: 0.62, Lz: 0.62, litR: 1.00, litG: 0.92, litB: 0.55, shadR: 0.26, shadG: 0.17, shadB: 0.07, rotY: 0.0105, bAmp: 0.012, bFreq: 1.40, wAmp: 0.008, wFreq: 0.95, goldOp: 0.55, bgCol: 0xA07010, bgOp: 0.52 },
+      SPEAKING: { Lx: -0.30, Ly: 0.80, Lz: 0.52, litR: 0.95, litG: 0.98, litB: 1.00, shadR: 0.22, shadG: 0.38, shadB: 0.70, rotY: 0.0045, bAmp: 0.018, bFreq: 3.00, wAmp: 0.013, wFreq: 1.35, goldOp: 0, bgCol: 0x3A9EFF, bgOp: 0.75 },
+    };
+
+    // ── Mouse — projection sur plan z=0 ──────────────────────────
+    const _plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const _ray = new THREE.Raycaster();
+    const _m2d = new THREE.Vector2();
+    const _hit = new THREE.Vector3();
+    const _worldMouse = new THREE.Vector3(9999, 9999, 9999);
+
+    // Large zone, gentle push, slow elastic return
+    const INFLUENCE_R = 115;
+    const PUSH_STR = 4.0;
+    const SPRING_K = 0.032;
+    const DAMPING = 0.93;
+
+    window.addEventListener('mousemove', (e) => {
+      _m2d.x = (e.clientX / window.innerWidth) * 2 - 1;
+      _m2d.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      _ray.setFromCamera(_m2d, camera);
+      if (_ray.ray.intersectPlane(_plane, _hit)) _worldMouse.copy(_hit);
+    });
+
+    // ── Animation ─────────────────────────────────────────────────
+    var sphereState = 'IDLE';   // var intentionnel : accessible depuis voice.js
+    const threeClock = new THREE.Clock();
+    let elapsed = 0;
+    let _prevState = '';
+
+    function stepParticles(base, cur, vel, phase, N, C, t, mlx, mly, mlz, breathOff, IR2) {
+      for (let i = 0; i < N; i++) {
+        const i3 = i * 3;
+        const bx = base[i3], by = base[i3 + 1], bz = base[i3 + 2];
+        // Target: rest + breathing + very subtle shimmer
+        const shimmer = Math.sin(phase[i] + t * C.wFreq) * C.wAmp;
+        const r = 1 + breathOff + shimmer;
+        const tx = bx * r, ty = by * r, tz = bz * r;
+        // Spring toward target
+        let fx = (tx - cur[i3]) * SPRING_K;
+        let fy = (ty - cur[i3 + 1]) * SPRING_K;
+        let fz = (tz - cur[i3 + 2]) * SPRING_K;
+        // Mouse push — large zone, gentle force
+        const dx = cur[i3] - mlx, dy = cur[i3 + 1] - mly, dz = cur[i3 + 2] - mlz;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < IR2 && d2 > 0.01) {
+          const d = Math.sqrt(d2);
+          const str = PUSH_STR * (1 - d / INFLUENCE_R) / d;
+          fx += dx * str;
+          fy += dy * str;
+          fz += dz * str;
+        }
+        vel[i3] = (vel[i3] + fx) * DAMPING;
+        vel[i3 + 1] = (vel[i3 + 1] + fy) * DAMPING;
+        vel[i3 + 2] = (vel[i3 + 2] + fz) * DAMPING;
+        cur[i3] += vel[i3];
+        cur[i3 + 1] += vel[i3 + 1];
+        cur[i3 + 2] += vel[i3 + 2];
+      }
+    }
+
+    function animateSphere() {
+      requestAnimationFrame(animateSphere);
+      const dt = Math.min(threeClock.getDelta(), 0.05);
+      elapsed += dt;
+      const t = elapsed;
+      const S = sphereState;
+      const C = STATES[S] || STATES.IDLE;
+
+      if (S !== _prevState) {
+        recomputeColors(baseSM, colSM, N_SM, C.Lx, C.Ly, C.Lz, C.litR, C.litG, C.litB, C.shadR, C.shadG, C.shadB);
+        recomputeColors(baseBG, colBG, N_BG, C.Lx, C.Ly, C.Lz, C.litR, C.litG, C.litB, C.shadR, C.shadG, C.shadB);
+        attrColSM.needsUpdate = true;
+        attrColBG.needsUpdate = true;
+        bgGlowMat.color.set(C.bgCol);
+        _prevState = S;
+      }
+
+      // Slow Y rotation (facteur 0.05 en veille, 1.0 normal)
+      sphereGroup.rotation.y += C.rotY * (window._sphereRotationMultiplier ?? 1.0);
+
+      // Transform world mouse → sphere local space (undo Y rotation)
+      const ry = -sphereGroup.rotation.y;
+      const cosRy = Math.cos(ry), sinRy = Math.sin(ry);
+      const mlx = _worldMouse.x * cosRy - _worldMouse.z * sinRy;
+      const mly = _worldMouse.y;
+      const mlz = _worldMouse.x * sinRy + _worldMouse.z * cosRy;
+
+      const breathOff = Math.sin(t * C.bFreq) * C.bAmp;
+      const IR2 = INFLUENCE_R * INFLUENCE_R;
+
+      stepParticles(baseSM, curSM, velSM, phaseSM, N_SM, C, t, mlx, mly, mlz, breathOff, IR2);
+      stepParticles(baseBG, curBG, velBG, phaseBG, N_BG, C, t, mlx, mly, mlz, breathOff, IR2);
+
+      attrPosSM.needsUpdate = true;
+      attrPosBG.needsUpdate = true;
+
+      bgGlowMat.opacity = C.bgOp + Math.sin(t * 0.72) * 0.05;
+      goldMat.opacity = C.goldOp * (0.26 + 0.10 * Math.sin(t * 2.6));
+
+      renderer.render(scene, camera);
+    }
+    animateSphere();
+
+    // ── Sleep mode — contrôle depuis wakeup.js ────────────────────────────
+    window._sphereRotationMultiplier = 1.0;
+
+    window.sphereSetSleepMode = function (sleeping) {
+      window._sphereRotationMultiplier = sleeping ? 0.05 : 1.0;
+      if (sleeping) {
+        if (typeof gsap !== 'undefined') {
+          gsap.to(matSM, { opacity: 0.08, duration: 2.0 });
+          gsap.to(matBG, { opacity: 0.05, duration: 2.0 });
+          gsap.to(bgGlowMat, { opacity: 0.12, duration: 2.0 });
+        } else {
+          matSM.opacity = 0.08; matBG.opacity = 0.05;
+        }
+      } else {
+        if (typeof gsap !== 'undefined') {
+          gsap.to(matSM, { opacity: 0.95, duration: 1.0 });
+          gsap.to(matBG, { opacity: 0.75, duration: 1.0 });
+          gsap.to(bgGlowMat, { opacity: 0.68, duration: 1.0 });
+        } else {
+          matSM.opacity = 0.95; matBG.opacity = 0.75;
+        }
+      }
+    };
+
+    // ── Snapshot of initial sphere positions (before any animation) ──────────
+    const _origSM = baseSM.slice();
+    const _origBG = baseBG.slice();
+
+    // ── Formation animation — Bézier storm ───────────────────────────────────
+    // Each particle flies on a curved Bézier arc from a far random position to
+    // its sphere target. Spring is neutralised (baseSM = curSM each frame).
+    // Staggered delays create a streaming "nebula condensing" visual.
+    window.spherePlayFormationAnim = function (onComplete) {
+      const DURATION = 4.8; // seconds — long enough to enjoy the animation
+      const STAGGER = 1.6; // max random delay before a particle starts moving
+      const TRAVEL = 2.2; // seconds for one particle to reach its target
+
+      const N_SM = curSM.length / 3;
+      const N_BG = curBG.length / 3;
+
+      // Per particle: [sx,sy,sz, ctrlX,ctrlY,ctrlZ, delay]  (7 floats)
+      const bezSM = new Float32Array(N_SM * 7);
+      const bezBG = new Float32Array(N_BG * 7);
+
+      function fillBez(N, orig, bez) {
+        for (let i = 0; i < N; i++) {
+          // Start on distant random shell — correct Y-up spherical coords
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const r = 5.5 + Math.random() * 3.5;
+          const sx = r * Math.sin(phi) * Math.cos(theta);
+          const sy = r * Math.cos(phi);                      // Y is up
+          const sz = r * Math.sin(phi) * Math.sin(theta);
+          const ex = orig[i * 3], ey = orig[i * 3 + 1], ez = orig[i * 3 + 2];
+
+          // Control point = midpoint + perpendicular offset (cross-product method)
+          const dx = ex - sx, dy = ey - sy, dz = ez - sz;
+          const ax = Math.random() - 0.5, ay = Math.random() - 0.5, az = Math.random() - 0.5;
+          let cpx = dy * az - dz * ay, cpy = dz * ax - dx * az, cpz = dx * ay - dy * ax;
+          const cpl = Math.sqrt(cpx * cpx + cpy * cpy + cpz * cpz) + 0.001;
+          const curve = 1.8 + Math.random() * 3.0;
+          const mx = (sx + ex) * 0.5, my = (sy + ey) * 0.5, mz = (sz + ez) * 0.5;
+
+          bez[i * 7] = sx; bez[i * 7 + 1] = sy; bez[i * 7 + 2] = sz;
+          bez[i * 7 + 3] = mx + (cpx / cpl) * curve;
+          bez[i * 7 + 4] = my + (cpy / cpl) * curve;
+          bez[i * 7 + 5] = mz + (cpz / cpl) * curve;
+          bez[i * 7 + 6] = Math.random() * STAGGER; // random stagger delay
+        }
+      }
+      fillBez(N_SM, _origSM, bezSM);
+      fillBez(N_BG, _origBG, bezBG);
+
+      // Place particles at start positions, zero spring velocities
+      for (let i = 0; i < N_SM; i++) {
+        const i3 = i * 3;
+        curSM[i3] = bezSM[i * 7]; curSM[i3 + 1] = bezSM[i * 7 + 1]; curSM[i3 + 2] = bezSM[i * 7 + 2];
+        baseSM[i3] = curSM[i3]; baseSM[i3 + 1] = curSM[i3 + 1]; baseSM[i3 + 2] = curSM[i3 + 2];
+      }
+      for (let i = 0; i < N_BG; i++) {
+        const i3 = i * 3;
+        curBG[i3] = bezBG[i * 7]; curBG[i3 + 1] = bezBG[i * 7 + 1]; curBG[i3 + 2] = bezBG[i * 7 + 2];
+        baseBG[i3] = curBG[i3]; baseBG[i3 + 1] = curBG[i3 + 1]; baseBG[i3 + 2] = curBG[i3 + 2];
+      }
+      velSM.fill(0); velBG.fill(0);
+      attrPosSM.needsUpdate = true; attrPosBG.needsUpdate = true;
+
+      // Fade in gradually so particles appear to materialise
+      matSM.opacity = 0; matBG.opacity = 0; bgGlowMat.opacity = 0;
+      if (typeof gsap !== 'undefined') {
+        gsap.to(matSM, { opacity: 0.95, duration: 1.0, delay: 0.25, ease: 'power1.in' });
+        gsap.to(matBG, { opacity: 0.75, duration: 1.0, delay: 0.25, ease: 'power1.in' });
+        gsap.to(bgGlowMat, { opacity: 0.68, duration: 1.3, delay: 0.5 });
+      }
+
+      const t0 = performance.now();
+
+      function tick() {
+        // Zero velocities so spring physics doesn't interfere
+        velSM.fill(0); velBG.fill(0);
+
+        const sec = (performance.now() - t0) * 0.001;
+
+        for (let i = 0; i < N_SM; i++) {
+          const i3 = i * 3;
+          const lt = (sec - bezSM[i * 7 + 6]) / TRAVEL;
+          let px, py, pz;
+          if (lt <= 0) {
+            px = bezSM[i * 7]; py = bezSM[i * 7 + 1]; pz = bezSM[i * 7 + 2];
+          } else {
+            const t = lt >= 1 ? 1 : 1 - Math.pow(1 - lt, 3); // ease-out cubic
+            const t1 = 1 - t;
+            px = t1 * t1 * bezSM[i * 7] + 2 * t1 * t * bezSM[i * 7 + 3] + t * t * _origSM[i3];
+            py = t1 * t1 * bezSM[i * 7 + 1] + 2 * t1 * t * bezSM[i * 7 + 4] + t * t * _origSM[i3 + 1];
+            pz = t1 * t1 * bezSM[i * 7 + 2] + 2 * t1 * t * bezSM[i * 7 + 5] + t * t * _origSM[i3 + 2];
+          }
+          curSM[i3] = px; curSM[i3 + 1] = py; curSM[i3 + 2] = pz;
+          baseSM[i3] = px; baseSM[i3 + 1] = py; baseSM[i3 + 2] = pz;
+        }
+
+        for (let i = 0; i < N_BG; i++) {
+          const i3 = i * 3;
+          const lt = (sec - bezBG[i * 7 + 6]) / TRAVEL;
+          let px, py, pz;
+          if (lt <= 0) {
+            px = bezBG[i * 7]; py = bezBG[i * 7 + 1]; pz = bezBG[i * 7 + 2];
+          } else {
+            const t = lt >= 1 ? 1 : 1 - Math.pow(1 - lt, 3);
+            const t1 = 1 - t;
+            px = t1 * t1 * bezBG[i * 7] + 2 * t1 * t * bezBG[i * 7 + 3] + t * t * _origBG[i3];
+            py = t1 * t1 * bezBG[i * 7 + 1] + 2 * t1 * t * bezBG[i * 7 + 4] + t * t * _origBG[i3 + 1];
+            pz = t1 * t1 * bezBG[i * 7 + 2] + 2 * t1 * t * bezBG[i * 7 + 5] + t * t * _origBG[i3 + 2];
+          }
+          curBG[i3] = px; curBG[i3 + 1] = py; curBG[i3 + 2] = pz;
+          baseBG[i3] = px; baseBG[i3 + 1] = py; baseBG[i3 + 2] = pz;
+        }
+
+        attrPosSM.needsUpdate = true; attrPosBG.needsUpdate = true;
+
+        if (sec < DURATION) {
+          requestAnimationFrame(tick);
+        } else {
+          // Restore real base positions — spring handles final micro-settling
+          for (let i = 0; i < baseSM.length; i++) baseSM[i] = _origSM[i];
+          for (let i = 0; i < baseBG.length; i++) baseBG[i] = _origBG[i];
+          velSM.fill(0); velBG.fill(0);
+          if (onComplete) onComplete();
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+
+    // ── Shockwave — onde de choc depuis la sphère au démarrage ───────────
+    window.sphereTriggerShockwave = function () {
+      const flash = document.createElement('div');
+      flash.style.cssText = 'position:fixed;inset:0;z-index:5;pointer-events:none;'
+        + 'background:radial-gradient(circle at center,rgba(74,158,255,0.22) 0%,transparent 52%);';
+      document.body.appendChild(flash);
+      if (typeof gsap !== 'undefined') {
+        gsap.to(flash, { opacity: 0, duration: 1.4, ease: 'power2.out', onComplete: () => flash.remove() });
+        bgGlowMat.opacity = 1.4;
+        gsap.to(bgGlowMat, { opacity: 0.68, duration: 1.0, ease: 'power2.out' });
+      } else {
+        flash.remove();
+      }
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  CLOCK
+    // ══════════════════════════════════════════════════════════════
+    const DAYS = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
+    const MONTHS = ['JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN', 'JUILLET', 'AOÛT', 'SEPTEMBRE', 'OCTOBRE', 'NOVEMBRE', 'DÉCEMBRE'];
+    function updateClock() {
+      const now = new Date();
+      const h = now.getHours(), m = now.getMinutes();
+      document.getElementById('clock-hm').textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      document.getElementById('clock-date').textContent = DAYS[now.getDay()] + ', ' + now.getDate() + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+    }
+    updateClock(); setInterval(updateClock, 1000);
+
+
+    // ══════════════════════════════════════════════════════════════
+    //  SESSION MANAGEMENT
+    // ══════════════════════════════════════════════════════════════
+    let _sessCache = [];
+    let _dropOpen = false;
+
+    function toggleSessionDrop() {
+      _dropOpen ? closeSessionDrop() : openSessionDrop();
+    }
+
+    function openSessionDrop() {
+      const hd = document.getElementById('conv-hd');
+      const drop = document.getElementById('session-drop');
+      const rect = hd.getBoundingClientRect();
+      drop.style.top = rect.bottom + 'px';
+      drop.style.left = rect.left + 'px';
+      drop.style.width = rect.width + 'px';
+      drop.style.display = 'block';
+      document.getElementById('session-btn').classList.add('open');
+      _dropOpen = true;
+      _loadSessionList();
+    }
+
+    function closeSessionDrop() {
+      document.getElementById('session-drop').style.display = 'none';
+      document.getElementById('session-btn').classList.remove('open');
+      _dropOpen = false;
+    }
+
+    async function _loadSessionList() {
+      try {
+        const r = await fetch('/api/sessions');
+        _sessCache = await r.json();
+        _renderSessionList();
+        _updateSessionLabel();
+      } catch (e) { console.warn('sessions error', e); }
+    }
+
+    function _renderSessionList() {
+      const list = document.getElementById('sdrop-list');
+      if (!list) return;
+      if (!_sessCache.length) {
+        list.innerHTML = '<div style="padding:10px 14px;font:400 10px/1 \'DM Mono\',monospace;color:rgba(74,158,255,0.30);letter-spacing:.1em">Aucune session</div>';
+        return;
+      }
+      list.innerHTML = _sessCache.map(s => {
+        const on = s.id === sessionId;
+        const d = s.date.slice(5).replace('-', '/');
+        const label = s.title || s.preview;
+        return `<button class="sdrop-item${on ? ' active' : ''}" onclick="switchSession('${s.id}')">
+          <div class="sdrop-dot${on ? ' on' : ''}"></div>
+          <div style="min-width:0">
+            <div class="sdrop-preview">${_esc(label)}</div>
+            <div class="sdrop-meta">${d} · ${s.message_count} msg</div>
+          </div>
+        </button>`;
+      }).join('');
+    }
+
+    function _updateSessionLabel() {
+      const el = document.getElementById('session-label');
+      if (!el) return;
+      if (!sessionId) { el.textContent = 'NOUVELLE SESSION'; return; }
+      const s = _sessCache.find(x => x.id === sessionId);
+      if (s) {
+        el.textContent = s.title || s.preview || s.date;
+      } else {
+        el.textContent = sessionId.slice(0, 8);
+      }
+    }
+
+    // Expose pour panel.js : met à jour le titre d'une session dans le cache + header
+    window._convUpdateTitle = function (id, title) {
+      const s = _sessCache.find(x => x.id === id);
+      if (s) s.title = title;
+      _updateSessionLabel();
+      _renderSessionList();
+    };
+
+    // Expose pour panel.js : switche la session active + charge l'historique dans le chat
+    window._convSwitchSession = switchSession;
+
+    function _esc(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function newSession() {
+      localStorage.removeItem('crush_session_id');
+      sessionId = null;
+      chat.innerHTML = '';
+      currentMsgEl = null;
+      closeSessionDrop();
+      document.getElementById('session-label').textContent = 'NOUVEAU';
+    }
+
+    async function switchSession(id) {
+      if (id === sessionId) { closeSessionDrop(); return; }
+      sessionId = id;
+      localStorage.setItem('crush_session_id', id);
+      currentMsgEl = null;
+      closeSessionDrop();
+      chat.innerHTML = '<div style="padding:16px;text-align:center;font:400 9px/1 \'DM Mono\',monospace;color:rgba(74,158,255,0.30);letter-spacing:.14em">CHARGEMENT…</div>';
+      try {
+        const r = await fetch(`/api/sessions/${id}/messages?limit=30`);
+        const msgs = await r.json();
+        chat.innerHTML = '';
+        for (const m of msgs) addMsg(m.role === 'user' ? 'vous' : 'crush', m.content);
+        chat.scrollTop = chat.scrollHeight;
+      } catch (e) {
+        chat.innerHTML = '';
+        console.warn('session load error', e);
+      }
+      _updateSessionLabel();
+    }
+
+    document.addEventListener('click', e => {
+      if (_dropOpen && !e.target.closest('#session-btn') && !e.target.closest('#session-drop')) {
+        closeSessionDrop();
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  WEBSOCKET
+    // ══════════════════════════════════════════════════════════════
+    const chat = document.getElementById('chat');
+    const msgInput = document.getElementById('msg-input');
+    const sendBtn = document.getElementById('send-btn');
+    const wsDot = document.getElementById('ws-dot');
+    let ws = null, sessionId = localStorage.getItem('crush_session_id') || null, currentMsgEl = null, currentMsgRaw = '';
+
+    function fmtTime() {
+      const d = new Date(); let h = d.getHours() % 12 || 12;
+      return String(h).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' ' + (d.getHours() >= 12 ? 'PM' : 'AM');
+    }
+
+    function addMsg(role, text, stream = false, notif = false) {
+      const wrap = document.createElement('div');
+      wrap.className = 'conv-msg' + (notif ? ' notif' : '');
+      const hd = document.createElement('div'); hd.className = 'conv-msg-hd';
+      const from = document.createElement('span');
+      from.className = 'conv-from ' + (role === 'crush' ? 'crush' : 'vous');
+      from.textContent = notif ? '🔔 RAPPEL' : (role === 'crush' ? (window.CRUSH_ASSISTANT_NAME || 'CRUSH') : 'VOUS');
+      const time = document.createElement('span'); time.className = 'conv-msg-time'; time.textContent = fmtTime();
+      hd.append(from, time);
+      const body = document.createElement('div'); body.className = 'conv-msg-text' + (stream ? ' streaming' : '');
+      body.textContent = text;
+      wrap.append(hd, body); chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+      return body;
+    }
+
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws`);
+      ws.onopen = () => { wsDot.style.background = 'var(--green)'; sphereState = 'IDLE'; };
+      ws.onclose = () => { wsDot.style.background = 'var(--text-dim)'; setTimeout(connect, 2000); };
+      ws.onerror = () => ws.close();
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent('crush:ws', { detail: msg }));
+        if (msg.type === 'start') {
+          sessionId = msg.session_id; localStorage.setItem('crush_session_id', sessionId);
+          if (typeof window._cpSetSession === 'function') window._cpSetSession(sessionId);
+          sphereState = 'THINKING'; currentMsgEl = addMsg('crush', '', true); currentMsgRaw = '';
+        } else if (msg.type === 'chunk' && currentMsgEl) {
+          currentMsgRaw += msg.content;
+          // Masquer le code brut mindmap pendant le streaming, afficher ↗… à la place
+          currentMsgEl.textContent = currentMsgRaw
+            .replace(/\[MINDMAP\][\s\S]*\[\/MINDMAP\]/, '↗')
+            .replace(/\[MINDMAP\][\s\S]*$/, '↗…');
+          chat.scrollTop = chat.scrollHeight; sphereState = 'SPEAKING';
+        } else if (msg.type === 'done') {
+          if (currentMsgEl) { checkForMindmapRaw(currentMsgEl, currentMsgRaw); currentMsgEl.classList.remove('streaming'); }
+          currentMsgEl = null; currentMsgRaw = ''; sphereState = 'IDLE'; msgInput.disabled = false; msgInput.focus();
+          _loadSessionList();
+          if (typeof resetInactivityTimer === 'function') resetInactivityTimer();
+        } else if (msg.type === 'notification') {
+          addMsg('crush', msg.content, false, true);
+        } else if (msg.type === 'project_created') {
+          _upsertProject(msg.project);
+        } else if (msg.type === 'project_update') {
+          _upsertProject({ id: msg.project_id, status: msg.status, steps: msg.steps });
+        } else if (msg.type === 'project_done') {
+          _upsertProject({ id: msg.project_id, status: 'done' });
+          addMsg('crush', `Mission terminée : ${msg.title}`, false, true);
+        } else if (msg.type === 'approval_request') {
+          _showApproval(msg);
+        } else if (msg.type === 'vision_objects') {
+          if (typeof mpSetYoloObjects === 'function') mpSetYoloObjects(msg.objects, performance.now());
+        } else if (msg.type === 'error') {
+          if (currentMsgEl) currentMsgEl.classList.remove('streaming');
+          currentMsgEl = null; sphereState = 'IDLE'; msgInput.disabled = false;
+        } else if (msg.type === 'map_fly_to') {
+          if (window.Globe) window.Globe.handleFlyTo(msg);
+        } else if (msg.type === 'map_zoom_out') {
+          if (window.Globe) window.Globe.mapZoomOut();
+        } else if (msg.type === 'map_zoom_in') {
+          if (window.Globe) window.Globe.mapZoomIn();
+        } else if (msg.type === 'map_globe_view') {
+          if (window.Globe) window.Globe.transitionToGlobe();
+        } else if (msg.type === 'toggle_panels') {
+          document.getElementById('panels-toggle')?.click();
+        } else if (msg.type === 'wake_up') {
+          if (window._crushSleeping && typeof triggerWakeUp === 'function') triggerWakeUp();
+        } else if (msg.type === 'preset_started' || msg.type === 'preset_step' || msg.type === 'preset_finished') {
+          window._handlePresetEvent && window._handlePresetEvent(msg);
+        }
+      };
+    }
+
+    function send() {
+      const text = msgInput.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      addMsg('vous', text); msgInput.value = ''; msgInput.disabled = true;
+      sphereState = 'LISTENING';
+      setTimeout(() => { if (sphereState === 'LISTENING') sphereState = 'THINKING'; }, 400);
+      ws.send(JSON.stringify({ message: text, session_id: sessionId }));
+    }
+
+    sendBtn.addEventListener('click', send);
+    msgInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    connect();
+    _loadSessionList();
+
+    // ══════════════════════════════════════════════════════════════
+    //  PERMISSIONS
+    // ══════════════════════════════════════════════════════════════
+    window._perms = { microphone: false, screen: true, camera: true, files: true };
+
+    function _updatePermBtn(key, enabled) {
+      const btn = document.getElementById('perm-' + key);
+      if (btn) btn.classList.toggle('active', enabled);
+    }
+
+    async function loadPermissions() {
+      try {
+        const r = await fetch('/api/permissions');
+        if (!r.ok) return;
+        const data = await r.json();
+        Object.keys(data).forEach(k => {
+          window._perms[k] = data[k];
+          _updatePermBtn(k, data[k]);
+        });
+      } catch (e) { console.warn('permissions load error', e); }
+    }
+
+    async function togglePerm(key) {
+      const enabled = !window._perms[key];
+      window._perms[key] = enabled;
+      _updatePermBtn(key, enabled);
+
+      if (key === 'microphone') {
+        if (enabled) {
+          window._voiceClient?._start().catch(err => {
+            console.error("Voice start error:", err);
+            window._perms.microphone = false;
+            _updatePermBtn('microphone', false);
+          });
+        } else {
+          window._voiceClient?._stop();
+        }
+        return;
+      }
+
+      if (key === 'camera') {
+        if (enabled) { camOpen(); }
+        else { _camStopStream(); } // l'API est appelée ci-dessous
+      }
+
+      try {
+        await fetch('/api/permissions/' + key, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+      } catch (e) { console.warn('permission toggle error', e); }
+    }
+
+    // Helpers accessibles depuis mediapipe_vision.js (let n'est pas sur window)
+    window._crushWsSend = data => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); };
+    window._crushSessionId = () => sessionId;
+
+    loadPermissions();
+
+    // ══════════════════════════════════════════════════════════════
+    //  CAMERA WINDOW
+    // ══════════════════════════════════════════════════════════════
+    let _camStream = null;
+
+    function _camStopStream() {
+      if (typeof mpStop === 'function') mpStop();
+      const win = document.getElementById('cam-win');
+      if (win) win.style.display = 'none';
+      if (_camStream) { _camStream.getTracks().forEach(t => t.stop()); _camStream = null; }
+      const v = document.getElementById('cam-video');
+      if (v) v.srcObject = null;
+    }
+
+    function camOpen() {
+      const win = document.getElementById('cam-win');
+      win.style.display = 'flex';
+      win.classList.remove('minimized');
+      document.getElementById('cam-body').style.display = 'block';
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        .then(stream => {
+          _camStream = stream;
+          const video = document.getElementById('cam-video');
+          video.srcObject = stream;
+          // Démarre MediaPipe dès que la vidéo a ses dimensions
+          const _startMp = () => {
+            if (typeof mpInit !== 'function') return;
+            mpInit().then(() => { if (typeof mpStart === 'function') mpStart(); }).catch(e => console.warn('[MediaPipe]', e));
+          };
+          if (video.readyState >= 1) {
+            _startMp(); // métadonnées déjà disponibles
+          } else {
+            video.onloadedmetadata = _startMp;
+          }
+        })
+        .catch(err => {
+          console.error('Camera error:', err);
+          _camStopStream();
+          window._perms.camera = false;
+          _updatePermBtn('camera', false);
+          fetch('/api/permissions/camera', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) }).catch(() => { });
+        });
+    }
+
+    function camCloseBtn() {
+      _camStopStream();
+      // Synchro bouton + API si la caméra était activée
+      if (window._perms.camera) {
+        window._perms.camera = false;
+        _updatePermBtn('camera', false);
+        fetch('/api/permissions/camera', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) }).catch(() => { });
+      }
+    }
+
+    function camToggleMinimize() {
+      const win = document.getElementById('cam-win');
+      const body = document.getElementById('cam-body');
+      const isMin = win.classList.toggle('minimized');
+      body.style.display = isMin ? 'none' : 'block';
+    }
+
+    // Drag
+    window.addEventListener('DOMContentLoaded', () => {
+      const win = document.getElementById('cam-win');
+      const handle = document.getElementById('cam-drag-handle');
+      if (!win || !handle) return;
+      let sX = 0, sY = 0, sL = 0, sT = 0;
+      handle.addEventListener('mousedown', e => {
+        if (e.target.closest('.cam-ctrl-btn')) return;
+        sX = e.clientX; sY = e.clientY;
+        sL = win.offsetLeft; sT = win.offsetTop;
+        const onMove = e => {
+          win.style.left = Math.max(0, sL + e.clientX - sX) + 'px';
+          win.style.top = Math.max(0, sT + e.clientY - sY) + 'px';
+        };
+        const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        e.preventDefault();
+      });
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  WIDGETS — Notion tasks + Google Calendar events
+    // ══════════════════════════════════════════════════════════════
+    const SVG_DONE = `<svg class="task-ico" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="3" fill="#2D7DD2"/><polyline points="4,8.5 6.5,11 12,5.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const SVG_TODO = `<svg class="task-ico" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="3" stroke="#3A4558" stroke-width="1.2" fill="none"/></svg>`;
+
+    async function loadTasks() {
+      try {
+        const r = await fetch('/api/tasks');
+        if (!r.ok) return;
+        const { tasks } = await r.json();
+        const list = document.getElementById('tasks-list');
+        const badge = document.getElementById('tasks-badge');
+        if (!tasks.length) { list.innerHTML = '<div class="ev-loading">Aucune tâche</div>'; return; }
+        badge.textContent = tasks.length;
+        list.innerHTML = tasks.map(t => `
+      <div class="task${t.done ? ' done' : ''}">
+        ${t.done ? SVG_DONE : SVG_TODO}
+        ${t.text}
+      </div>`).join('');
+      } catch (e) { console.warn('tasks widget error', e); }
+    }
+
+    async function loadEvents() {
+      try {
+        const r = await fetch('/api/events');
+        if (!r.ok) return;
+        const { events } = await r.json();
+        const list = document.getElementById('events-list');
+        const badge = document.getElementById('events-badge');
+        if (!events.length) { list.innerHTML = '<div class="ev-loading">Aucun événement aujourd\'hui</div>'; return; }
+        badge.textContent = events.length;
+        list.innerHTML = events.map(e => `
+      <div class="event">
+        <div class="ev-time">${e.time}</div>
+        <div>
+          <div class="ev-name">${e.name}</div>
+          ${e.subtitle ? `<div class="ev-sub">${e.subtitle}</div>` : ''}
+        </div>
+        <div class="ev-pip"></div>
+      </div>`).join('');
+      } catch (e) { console.warn('events widget error', e); }
+    }
+
+    loadTasks();
+    loadEvents();
+    setInterval(loadTasks, 5 * 60 * 1000);
+    setInterval(loadEvents, 5 * 60 * 1000);
+
+    // ══════════════════════════════════════════════════════════════
+    //  PROJECTS / MISSIONS
+    // ══════════════════════════════════════════════════════════════
+    let _projects = {};
+    let _pendingApproval = null;
+
+    const _STATUS_LABEL = {
+      planning: 'PLANIF', running: 'EN COURS', done: 'TERMINÉ',
+      failed: 'ÉCHEC', killed: 'ARRÊTÉ', paused: 'PAUSE',
+    };
+
+    function _upsertProject(data) {
+      const id = data.id;
+      if (!id) return;
+      _projects[id] = Object.assign(_projects[id] || {}, data);
+      _renderProjects();
+    }
+
+    function _renderProjects() {
+      const list = document.getElementById('missions-list');
+      const section = document.getElementById('missions-section');
+      const badge = document.getElementById('missions-badge');
+      if (!list) return;
+
+      const all = Object.values(_projects);
+      const active = all.filter(p => p.status === 'running' || p.status === 'planning');
+      badge.textContent = active.length || all.length;
+      section.style.display = all.length ? 'flex' : 'none';
+
+      list.innerHTML = all.slice(-5).reverse().map(p => {
+        const steps = p.steps || [];
+        const done = steps.filter(s => s.status === 'done').length;
+        const total = steps.length;
+        const pct = total ? Math.round(done / total * 100) : 0;
+        const st = (p.status || 'planning').toLowerCase();
+        const label = _STATUS_LABEL[st] || st.toUpperCase();
+        const fillClass = st === 'done' ? 'done' : st === 'failed' ? 'failed' : '';
+        const canKill = st === 'running' || st === 'planning';
+        const canRetry = st === 'failed' || st === 'running';
+        return `<div class="proj-card" id="proj-${p.id}">
+          <div class="proj-row1">
+            <div class="proj-title">${p.title || 'Mission…'}</div>
+            <span class="proj-badge ${st}">${label}</span>
+            ${canRetry ? `<button class="proj-kill" onclick="retryProject('${p.id}')" title="Relancer depuis l'étape bloquée" style="color:#60a5fa">↺</button>` : ''}
+            ${canKill ? `<button class="proj-kill" onclick="killProject('${p.id}')" title="Arrêter">✕</button>` : ''}
+          </div>
+          <div class="proj-row2">
+            <div class="proj-prog-bar"><div class="proj-prog-fill ${fillClass}" style="width:${pct}%"></div></div>
+            <span class="proj-steps">${total ? `${done}/${total}` : '—'}</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function killProject(id) {
+      try {
+        await fetch(`/api/projects/${id}/kill`, { method: 'POST' });
+        if (_projects[id]) _projects[id].status = 'killed';
+        _renderProjects();
+      } catch (e) { console.warn('kill project error', e); }
+    }
+
+    async function retryProject(id) {
+      try {
+        await fetch(`/api/projects/${id}/retry`, { method: 'POST' });
+      } catch (e) { console.warn('retry project error', e); }
+    }
+
+    function _showApproval(msg) {
+      const modal = document.getElementById('approval-modal');
+      if (msg.action_id) {
+        // Approbation catégorielle (ApprovalChecker)
+        _pendingApproval = { action_id: msg.action_id };
+        document.getElementById('approval-project-title').textContent = msg.category || 'action';
+        document.getElementById('approval-step-desc').textContent = msg.description || '';
+      } else {
+        // Approbation projet (orchestrateur)
+        _pendingApproval = { project_id: msg.project_id, step_id: msg.step_id };
+        const proj = _projects[msg.project_id] || {};
+        document.getElementById('approval-project-title').textContent = proj.title || msg.project_id;
+        document.getElementById('approval-step-desc').textContent = msg.description || msg.step_id;
+      }
+      modal.style.display = 'block';
+    }
+
+    async function resolveApproval(approved) {
+      if (!_pendingApproval) return;
+      const pending = _pendingApproval;
+      _pendingApproval = null;
+      document.getElementById('approval-modal').style.display = 'none';
+      try {
+        if (pending.action_id) {
+          await fetch(`/api/approvals/${pending.action_id}/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved }),
+          });
+        } else {
+          await fetch(`/api/projects/${pending.project_id}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step_id: pending.step_id, approved }),
+          });
+        }
+      } catch (e) { console.warn('approval error', e); }
+    }
+
+    async function _loadProjects() {
+      try {
+        const r = await fetch('/api/projects');
+        if (!r.ok) return;
+        const list = await r.json();
+        list.forEach(p => { _projects[p.id] = p; });
+        _renderProjects();
+      } catch (e) { console.warn('projects load error', e); }
+    }
+
+    _loadProjects();
+
+    // ══════════════════════════════════════════════════════════════
+    //  SPOTIFY PLAYER
+    // ══════════════════════════════════════════════════════════════
+    let _spPlaying = false;
+    let _spProgressMs = 0;
+    let _spDurationMs = 0;
+    let _spLastTick = 0;
+
+    function fmtMs(ms) {
+      const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+      return m + ':' + String(s % 60).padStart(2, '0');
+    }
+
+    function updateProgressBar() {
+      if (_spDurationMs <= 0) return;
+      if (_spPlaying) {
+        const elapsed = Date.now() - _spLastTick;
+        const current = Math.min(_spProgressMs + elapsed, _spDurationMs);
+        const pct = (current / _spDurationMs) * 100;
+        document.getElementById('prog-fill').style.width = pct + '%';
+        document.getElementById('prog-cur').textContent = fmtMs(current);
+      }
+    }
+
+    let _currentProvider = null;
+
+    function _updateMusicUI(d) {
+      const noProvider = document.getElementById('music-no-provider');
+      const disc       = document.getElementById('spotify-disconnected');
+      const player     = document.getElementById('spotify-player');
+      const badge      = document.getElementById('music-badge');
+
+      if (!d.provider) {
+        noProvider.style.display = 'block';
+        disc.style.display = 'none';
+        player.style.display = 'none';
+        return;
+      }
+
+      _currentProvider = d.provider;
+      noProvider.style.display = 'none';
+      badge.textContent = d.provider.toUpperCase();
+
+      if (!d.connected) {
+        disc.style.display = 'block';
+        player.style.display = 'none';
+        disc.querySelector('a').textContent = 'Connecter ' + d.provider + ' →';
+        disc.querySelector('a').href = '/api/' + d.provider + '/auth';
+        return;
+      }
+
+      disc.style.display = 'none';
+      player.style.display = 'block';
+
+      if (!d.track) {
+        document.getElementById('spotify-track').textContent = 'Rien en cours';
+        document.getElementById('spotify-artist').textContent = '—';
+        _spPlaying = false; _spDurationMs = 0;
+        return;
+      }
+
+      _spPlaying = d.is_playing;
+      _spProgressMs = d.progress_ms || 0;
+      _spDurationMs = d.duration_ms || 0;
+      _spLastTick = Date.now();
+
+      document.getElementById('spotify-track').textContent = d.track;
+      document.getElementById('spotify-artist').textContent = d.artist;
+      document.getElementById('spotify-album').textContent = d.album;
+      document.getElementById('sp-play-svg').innerHTML = d.is_playing
+        ? '<rect x="1.5" y="1" width="3.5" height="11" rx="1"/><rect x="7" y="1" width="3.5" height="11" rx="1"/>'
+        : '<polygon points="1,1 11,6.5 1,12"/>';
+
+      const img = document.getElementById('album-art-img');
+      if (d.album_art && img.src !== d.album_art) {
+        img.src = d.album_art;
+        img.style.display = 'block';
+      }
+
+      document.getElementById('prog-dur').textContent = fmtMs(_spDurationMs);
+      updateProgressBar();
+    }
+
+    async function loadMusicPlayer() {
+      try {
+        const r = await fetch('/api/music/status');
+        if (!r.ok) return;
+        _updateMusicUI(await r.json());
+      } catch (e) { console.warn('music player error', e); }
+    }
+
+    async function spotifyToggle() {
+      if (_spSdkPlayer && _currentProvider === 'spotify') {
+        await _spSdkPlayer.togglePlay();
+      } else {
+        const prov = _currentProvider || 'spotify';
+        await fetch('/api/' + prov + '/' + (_spPlaying ? 'pause' : 'play'), { method: 'POST' });
+        setTimeout(loadMusicPlayer, 300);
+      }
+    }
+
+    async function spotifyAction(action) {
+      if (_spSdkPlayer && _currentProvider === 'spotify') {
+        if (action === 'next') await _spSdkPlayer.nextTrack();
+        else if (action === 'previous') await _spSdkPlayer.previousTrack();
+      } else {
+        const prov = _currentProvider || 'spotify';
+        await fetch('/api/' + prov + '/' + action, { method: 'POST' });
+        setTimeout(loadMusicPlayer, 500);
+      }
+    }
+
+    // ── Spotify Web Playback SDK ──────────────────────────────────
+    let _spSdkPlayer = null;
+    let _spDeviceId = null;
+    let _spSdkReady = false;
+
+    function updateSpotifyFromSdk(state) {
+      const track = state.track_window?.current_track;
+      _updateMusicUI({
+        provider: 'spotify',
+        connected: true,
+        is_playing: !state.paused,
+        track: track?.name || null,
+        artist: track?.artists?.map(a => a.name).join(', ') || '',
+        album: track?.album?.name || '',
+        album_art: track?.album?.images?.[0]?.url || null,
+        progress_ms: state.position,
+        duration_ms: track?.duration_ms || 0,
+      });
+    }
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const player = new Spotify.Player({
+        name: window.CRUSH_ASSISTANT_NAME || 'CRUSH',
+        getOAuthToken: async cb => {
+          const r = await fetch('/api/spotify/token');
+          const { token } = await r.json();
+          cb(token);
+        },
+        volume: 0.5,
+      });
+
+      player.addListener('ready', ({ device_id }) => {
+        _spDeviceId = device_id;
+        _spSdkReady = true;
+        fetch('/api/spotify/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_id }),
+        });
+      });
+
+      player.addListener('not_ready', () => {
+        _spSdkReady = false;
+        _spDeviceId = null;
+      });
+
+      player.addListener('player_state_changed', state => {
+        if (!state) return;
+        updateSpotifyFromSdk(state);
+      });
+
+      player.connect();
+      _spSdkPlayer = player;
+    };
+
+    loadMusicPlayer();
+    setInterval(loadMusicPlayer, 30000);
+    setInterval(updateProgressBar, 1000);
+  </script>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script src="/mic_devices.js"></script>
+  <script src="/voice_client.js"></script>
+  <script type="module">
+    import { FilesetResolver, FaceDetector, GestureRecognizer }
+      from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm';
+    window._MediaPipeVision = { FilesetResolver, FaceDetector, GestureRecognizer };
+    window.dispatchEvent(new CustomEvent('mediapipe-loaded'));
+  </script>
+  <script src="/mediapipe_vision.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script>
+    // ── GSAP slide transitions + Intel Monde view ─────────────────
+    (function () {
+      const ov = document.getElementById('transition-overlay');
+      const ui = '.layout'; // #nav-bar excluded — has translateX(-50%) that conflicts with x-slide
+
+      window._prevIntelView = 'sphere';
+
+      // Direction set by the leaving page, read on enter
+      const dir = sessionStorage.getItem('tx-dir') || 'forward';
+      const xIn = dir === 'back' ? -40 : 40;
+      sessionStorage.removeItem('tx-dir');
+
+      // Enter: overlay opacity 1 → 0, layout slides in from the side
+      window.addEventListener('load', () => {
+        gsap.timeline()
+          .to(ov, { duration: 0.2, opacity: 0, ease: 'power2.out' })
+          .from(ui, { duration: 0.4, x: xIn, opacity: 0, filter: 'blur(6px)', ease: 'power2.out', clearProps: 'all' }, '<0.05');
+      });
+
+      // Open settings overlay
+      // ── Helpers ────────────────────────────────────────────────────────
+
+      const _VIEW_IDX = { sphere: 0, dashboard: 1, globe: 2, intel: 3, settings: 4 };
+
+      // Active le bouton de la vue, désactive tous les autres
+      function _setView(view) {
+        const map = { sphere: 'crush-toggle', dashboard: 'dashboard-nav-btn', globe: 'globe-toggle', intel: 'intel-toggle', settings: 'settings-nav-btn' };
+        Object.values(map).forEach(id => document.getElementById(id)?.classList.remove('active'));
+        if (map[view]) document.getElementById(map[view])?.classList.add('active');
+        window._currentView = view;
+      }
+
+      // +1 = navigation vers la droite (slide gauche), -1 = vers la gauche (slide droite)
+      function _txDir(from, to) {
+        return (_VIEW_IDX[to] ?? 2) >= (_VIEW_IDX[from] ?? 2) ? 1 : -1;
+      }
+
+      function _settingsIsOpen() { return false; }
+      function _closeSettingsIfOpen() {}
+
+      window._setView = _setView;
+      _setView('sphere');
+
+      // ── SPA panel helpers (Dashboard & Settings) ─────────────────────────
+      const _SPA_HIDE = ['main-layout', 'panels-toggle'];
+
+      function _showSpaPanel(type) {
+        const panel = document.getElementById('spa-panel');
+        if (!panel) return;
+        _SPA_HIDE.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        panel.style.display = 'block';
+        panel.getBoundingClientRect();
+        gsap.fromTo(panel, { opacity: 0, x: 32 }, { duration: 0.28, opacity: 1, x: 0, ease: 'power3.out' });
+        if (type === 'dashboard' && window.Dashboard) window.Dashboard.boot();
+        else if (type === 'settings' && window.Settings) window.Settings.boot();
+      }
+
+      function _hideSpaPanel(cb) {
+        const panel = document.getElementById('spa-panel');
+        if (!panel || panel.style.display === 'none') { if (cb) cb(); return; }
+        gsap.to(panel, {
+          duration: 0.22, opacity: 0, x: 32, ease: 'power3.in', onComplete: () => {
+            panel.style.display = 'none'; gsap.set(panel, { x: 0 });
+            _SPA_HIDE.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+            if (cb) cb();
+          }
+        });
+      }
+
+      const _isSpa = () => window._currentView === 'dashboard' || window._currentView === 'settings';
+
+      // ── Settings / Dashboard SPA handlers ───────────────────────────────
+      window.handleSettingsClick = function () {
+        if (window._currentView === 'settings') return;
+        if (window._currentView === 'intel') { window.navigateFromIntel('settings'); return; }
+        if (window._currentView === 'globe' && typeof Globe !== 'undefined') Globe.hide();
+        if (window._currentView === 'dashboard') {
+          _setView('settings');
+          if (window.Settings) window.Settings.boot();
+          return;
+        }
+        _setView('settings');
+        _showSpaPanel('settings');
+      };
+
+      window.handleDashboardClick = function () {
+        if (window._currentView === 'dashboard') return;
+        if (window._currentView === 'intel') { window.navigateFromIntel('dashboard'); return; }
+        if (window._currentView === 'globe' && typeof Globe !== 'undefined') Globe.hide();
+        if (window._currentView === 'settings') {
+          _setView('dashboard');
+          if (window.Dashboard) window.Dashboard.boot();
+          return;
+        }
+        _setView('dashboard');
+        _showSpaPanel('dashboard');
+      };
+
+      window.openSettings = window.handleSettingsClick;
+      window.closeSettings = function () { window.handleSphereClick(); };
+      window.goToSettings = window.handleSettingsClick;
+
+      window.transitionTo = function (href, dir) {
+        dir = dir || 'forward';
+        sessionStorage.setItem('tx-dir', dir);
+        gsap.set(ov, { pointerEvents: 'all' });
+        gsap.timeline({ onComplete: () => { window.location.href = href; } })
+          .to(ui, { duration: 0.28, x: dir === 'forward' ? -44 : 44, opacity: 0, filter: 'blur(5px)', ease: 'power2.in' })
+          .to(ov, { duration: 0.22, opacity: 1, ease: 'power2.in' }, '<');
+      };
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Transitions sans overlay : slide + crossfade direct, pas de flash noir
+      // ─────────────────────────────────────────────────────────────────────
+
+      const DUR_OUT = 0.26;   // durée slide-out du panneau UI
+      const DUR_IN = 0.34;   // durée slide-in du panneau UI
+      const DUR_OVL = 0.28;   // durée fade de l'overlay Intel
+      const EASE_OUT = 'power2.in';
+      const EASE_IN = 'power3.out';
+
+      function _slideOut(d) {
+        gsap.to(ui, { duration: DUR_OUT, x: -48 * d, opacity: 0, filter: 'blur(4px)', ease: EASE_OUT, overwrite: true });
+      }
+      function _slideIn(d, delay) {
+        gsap.fromTo(ui,
+          { x: 48 * d, opacity: 0, filter: 'blur(4px)' },
+          { duration: DUR_IN, x: 0, opacity: 1, filter: 'blur(0px)', ease: EASE_IN, clearProps: 'all', delay: delay ?? 0, overwrite: true }
+        );
+      }
+
+      // ── Globe ───────────────────────────────────────────────────────────
+      window.handleGlobeClick = function () {
+        if (window._currentView === 'globe') return;
+        if (window._currentView === 'intel') { window.navigateFromIntel('globe'); return; }
+        const go = () => {
+          if (typeof Globe !== 'undefined') Globe.show();
+          _setView('globe');
+          gsap.to(ui, { duration: 0.35, opacity: 1, x: 0, filter: 'blur(0px)', ease: 'power2.out' });
+        };
+        if (_isSpa()) { _hideSpaPanel(go); return; }
+        const d = _txDir(window._currentView, 'globe');
+        _slideOut(d);
+        setTimeout(go, DUR_OUT * 1000 * 0.6);
+      };
+
+      // ── Intel ────────────────────────────────────────────────────────────
+      function _checkIntelAvailability() {
+        const iframe = document.getElementById('intel-iframe');
+        const fallback = document.getElementById('intel-fallback');
+        fetch('http://localhost:3000', { mode: 'no-cors', cache: 'no-store' })
+          .then(() => {
+            if (iframe) { iframe.src = 'http://localhost:3000'; iframe.style.display = ''; }
+            if (fallback) fallback.classList.remove('visible');
+          })
+          .catch(() => {
+            if (iframe) { iframe.src = ''; iframe.style.display = 'none'; }
+            if (fallback) fallback.classList.add('visible');
+          });
+      }
+
+      window.handleIntelClick = function () {
+        if (window._currentView === 'intel') return;
+        if (window._currentView === 'globe' && typeof Globe !== 'undefined') Globe.hide();
+        window._prevIntelView = window._currentView;
+        const io = document.getElementById('intel-overlay');
+        if (io) gsap.set(io, { opacity: 0 });
+        const go = () => {
+          document.body.classList.add('intel-mode');
+          _setView('intel');
+          if (io) gsap.to(io, { duration: DUR_OVL, opacity: 1, ease: EASE_IN });
+          _checkIntelAvailability();
+        };
+        if (_isSpa()) { _hideSpaPanel(go); return; }
+        const d = _txDir(window._currentView, 'intel');
+        _slideOut(d);
+        setTimeout(go, DUR_OUT * 1000 * 0.7);
+      };
+
+      // ── Sortir de Intel ──────────────────────────────────────────────────
+      window.navigateFromIntel = function (target) {
+        if (window._currentView !== 'intel') return;
+        if (target === 'globe' && typeof Globe !== 'undefined') Globe.show();
+        const d = _txDir('intel', target);
+        const io = document.getElementById('intel-overlay');
+        if (io) gsap.to(io, {
+          duration: DUR_OVL * 0.8, opacity: 0, ease: EASE_OUT, onComplete: () => {
+            document.body.classList.remove('intel-mode'); gsap.set(io, { opacity: '' });
+          }
+        });
+        else document.body.classList.remove('intel-mode');
+        _setView(target);
+        if (target === 'dashboard' || target === 'settings') {
+          _showSpaPanel(target);
+        } else {
+          _slideIn(d, target === 'globe' ? 0 : DUR_OVL * 0.5);
+        }
+      };
+
+      // ── Crush / home ────────────────────────────────────────────────────
+      window.handleSphereClick = function () {
+        if (window._currentView === 'sphere') return;
+        if (window._currentView === 'intel') { window.navigateFromIntel('sphere'); return; }
+        if (_isSpa()) {
+          _hideSpaPanel(() => { _setView('sphere'); });
+          return;
+        }
+        if (window._currentView === 'globe') {
+          const d = _txDir('globe', 'sphere');
+          if (typeof Globe !== 'undefined') Globe.hide();
+          _setView('sphere');
+          _slideIn(d, 0.06);
+        }
+      };
+
+      // Escape
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (_settingsIsOpen()) { e.stopImmediatePropagation(); window.closeSettings(); return; }
+        if (window._currentView === 'intel') { e.stopImmediatePropagation(); window.navigateFromIntel(window._prevIntelView || 'sphere'); }
+      }, { capture: true });
+
+      // Empêche l'iframe Intel de voler le premier clic sur les boutons nav
+      document.addEventListener('mousedown', function (e) {
+        if (!document.body.classList.contains('intel-mode')) return;
+        if (!e.target.closest('#crush-toggle, #globe-toggle, #intel-toggle, #dashboard-nav-btn, #settings-nav-btn')) return;
+        const iframe = document.getElementById('intel-iframe');
+        if (iframe) { iframe.style.pointerEvents = 'none'; requestAnimationFrame(() => { iframe.style.pointerEvents = ''; }); }
+      }, true);
+
+      // ── Toggle panneaux latéraux ────────────────────────────────────────────
+      (function () {
+        let _panelsVisible = true;
+        const toggle = document.getElementById('panels-toggle');
+        if (!toggle) return;
+        toggle.addEventListener('click', () => {
+          _panelsVisible = !_panelsVisible;
+          const lp = document.getElementById('panel-left');
+          const rp = document.getElementById('panel-right');
+          gsap.to(lp, { duration: 0.3, x: _panelsVisible ? 0 : -310, opacity: _panelsVisible ? 1 : 0, ease: 'power2.inOut' });
+          gsap.to(rp, { duration: 0.3, x: _panelsVisible ? 0 : 370, opacity: _panelsVisible ? 1 : 0, ease: 'power2.inOut' });
+          gsap.to(toggle, { duration: 0.3, left: _panelsVisible ? '292px' : '-8px', ease: 'power2.inOut' });
+          toggle.classList.toggle('hidden-state', !_panelsVisible);
+        });
+      })();
+
+    })();
+  </script>
+
+  <!-- Mindmap modal -->
+  <div id="mindmap-modal">
+    <div id="mindmap-container">
+      <div id="mindmap-toolbar">
+        <span>CARTE MENTALE</span>
+        <div id="mindmap-toolbar-btns">
+          <button class="mindmap-btn" id="mindmap-export-btn">Exporter PNG</button>
+          <button class="mindmap-btn close" id="mindmap-close-btn">✕ Fermer</button>
+        </div>
+      </div>
+      <div id="mindmap-render"></div>
+    </div>
+  </div>
+
+  <!-- Scan overlay — Wake Up Phase 3 -->
+  <div id="scan-overlay" style="display:none;">
+    <div id="scan-bg"></div>
+    <video id="scan-webcam-feed" autoplay muted playsinline></video>
+    <canvas id="scan-landmarks-canvas"></canvas>
+    <div id="scan-hud">
+      <div id="scan-header">
+        <span id="scan-status-text">INITIALISATION SCAN...</span>
+        <span id="scan-system-text">CRUSH SECURITY v3.0</span>
+      </div>
+      <div class="scan-corner scan-corner-tl"></div>
+      <div class="scan-corner scan-corner-tr"></div>
+      <div class="scan-corner scan-corner-bl"></div>
+      <div class="scan-corner scan-corner-br"></div>
+      <div id="scan-line"></div>
+      <div class="scan-datapoint" style="top:32%;right:calc(50% - min(340px,27vw))">ID_VERIFY</div>
+      <div class="scan-datapoint" style="top:48%;right:calc(50% - min(340px,27vw))">FACIAL_MAP</div>
+      <div class="scan-datapoint" style="top:64%;right:calc(50% - min(340px,27vw))">AUTH_CHECK</div>
+      <div class="scan-datapoint" style="top:36%;left:calc(50% - min(340px,27vw))">SECURE</div>
+      <div class="scan-datapoint" style="top:60%;left:calc(50% - min(340px,27vw))">ENCRYPT</div>
+      <div id="scan-progress-container">
+        <div id="scan-progress-bar"></div>
+      </div>
+      <div id="scan-footer">
+        <span id="scan-percentage">0%</span>
+        <span id="scan-label">ANALYSE BIOMÉTRIQUE EN COURS</span>
+      </div>
+    </div>
+    <div id="scan-result" style="display:none;">
+      <div id="scan-result-icon"></div>
+      <div id="scan-result-text"></div>
+      <div id="scan-result-name"></div>
+    </div>
+  </div>
+
+  <!-- Sleep indicator — visible uniquement en mode veille -->
+  <div id="sleep-indicator">
+    <div id="sleep-indicator-dot"></div>
+    <span id="sleep-indicator-label">EN VEILLE</span>
+  </div>
+
+  <script>
+    // ── Mindmap ───────────────────────────────────────────────────────────────
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true });
+
+    const MINDMAP_RE = /\[MINDMAP\]([\s\S]*?)\[\/MINDMAP\]/;
+
+    function checkForMindmapRaw(el, rawText) {
+      const match = rawText.match(MINDMAP_RE);
+      if (!match) return;
+      let mermaidCode = match[1].trim();
+      mermaidCode = mermaidCode.replace(/^```mermaid\s*/i, '').replace(/```\s*$/, '').trim();
+      const before = rawText.replace(MINDMAP_RE, '').trim();
+      el.textContent = before ? before + ' ↗' : '↗ Carte mentale';
+      renderMindmap(mermaidCode);
+    }
+
+    // Compat voice.js (lit textContent directement)
+    function checkForMindmap(el) {
+      checkForMindmapRaw(el, el.textContent || '');
+    }
+
+    async function renderMindmap(code) {
+      const modal = document.getElementById('mindmap-modal');
+      const container = document.getElementById('mindmap-render');
+      try {
+        const { svg } = await mermaid.render('mindmap-svg-' + Date.now(), code);
+        container.innerHTML = svg;
+        // Appliquer palette Crush
+        container.querySelectorAll('svg circle, svg rect, svg ellipse').forEach(el => {
+          if (!el.style.fill || el.style.fill === 'none') return;
+          el.style.fill = 'rgba(45,125,210,0.15)';
+          el.style.stroke = '#4A9EFF';
+        });
+        const svgEl = container.querySelector('svg');
+        if (svgEl) svgEl.style.background = 'transparent';
+        modal.classList.add('open');
+      } catch (e) {
+        console.error('Mermaid render error', e);
+      }
+    }
+
+    document.getElementById('mindmap-close-btn').addEventListener('click', () => {
+      document.getElementById('mindmap-modal').classList.remove('open');
+    });
+
+    document.getElementById('mindmap-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+    });
+
+    document.getElementById('mindmap-export-btn').addEventListener('click', () => {
+      const svg = document.querySelector('#mindmap-render svg');
+      if (!svg) return;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([xml], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'mindmap.svg'; a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+  <!-- SPA : shared runtime + dashboard + settings -->
+  <script src="/_shared.js"></script>
+  <script>
+    // En mode SPA, l'atmosphère et la bottom nav sont déjà gérées par index.html
+    if (window.Crush) {
+      window.Crush.mountAtmosphere = function () {};
+      window.Crush.mountBottomNav = function () {};
+    }
+  </script>
+  <script src="/settings-charts.js"></script>
+  <script src="/dashboard.js"></script>
+  <script src="/settings.js"></script>
+
+  <!-- Wake Up sequence (Phase 0 — veille + timer, phases 1-5 à venir) -->
+  <!-- Chargé en dernier car dépend de GSAP -->
+  <script src="/wakeup.js"></script>
+
+  <!-- ── Keypad Studio Drawer ──────────────────────────────────── -->
+  <div id="kp-backdrop" onclick="window.closeKeypadDrawer()"></div>
+  <div id="kp-drawer" role="dialog" aria-label="Keypad Studio">
+    <button id="kp-drawer-close" onclick="window.closeKeypadDrawer()" title="Fermer (Échap)">✕</button>
+    <iframe id="kp-drawer-frame" src="" frameborder="0"></iframe>
+  </div>
+  <style>
+    #kp-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 900;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.22s;
+    }
+    #kp-backdrop.open { opacity: 1; pointer-events: all; }
+    #kp-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 78%;
+      background: var(--bg-0, #06080D);
+      border-left: 1px solid rgba(255, 255, 255, 0.07);
+      z-index: 901;
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: -24px 0 64px rgba(0, 0, 0, 0.45);
+    }
+    #kp-drawer.open { transform: translateX(0); }
+    #kp-drawer-close {
+      position: absolute; top: 13px; right: 15px;
+      background: none; border: none;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 15px; line-height: 1;
+      cursor: pointer; z-index: 2;
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.12s, background 0.12s;
+    }
+    #kp-drawer-close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+    #kp-drawer-frame { flex: 1; border: none; width: 100%; display: block; }
+  </style>
+  <script>
+    (function () {
+      var _loaded = false;
+      function _onEsc(e) { if (e.key === "Escape") window.closeKeypadDrawer(); }
+      window.openKeypadDrawer = function () {
+        var frame = document.getElementById("kp-drawer-frame");
+        if (!_loaded) { frame.src = "/macropad?embedded=1"; _loaded = true; }
+        document.getElementById("kp-backdrop").classList.add("open");
+        document.getElementById("kp-drawer").classList.add("open");
+        document.addEventListener("keydown", _onEsc);
+      };
+      window.closeKeypadDrawer = function () {
+        document.getElementById("kp-backdrop").classList.remove("open");
+        document.getElementById("kp-drawer").classList.remove("open");
+        document.removeEventListener("keydown", _onEsc);
+      };
+    })();
+    // Mise à jour dynamique de tous les éléments avec le nom de l'assistant
+    (function() {
+      var assistantName = window.CRUSH_ASSISTANT_NAME || 'Crush';
+
+      // Titre de l'onglet
+      document.title = assistantName;
+
+      // Title du bouton
+      var crushBtn = document.getElementById('crush-toggle');
+      if (crushBtn) {
+        crushBtn.title = assistantName;
+      }
+      
+      // Span dans les instructions
+      var helperSpan = document.getElementById('assistant-name-helper');
+      if (helperSpan) {
+        helperSpan.textContent = assistantName;
+      }
+      
+      // Placeholder de l'input
+      var msgInput = document.getElementById('msg-input');
+      if (msgInput) {
+        msgInput.placeholder = 'Parlez à ' + assistantName + '…';
+      }
+    })();
+  </script>
+</body>
+
+</html>

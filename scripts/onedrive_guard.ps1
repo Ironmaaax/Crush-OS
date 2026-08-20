@@ -1,0 +1,248 @@
+function Test-CrushPathUnderOneDrive {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $root = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $bases = @(
+        $env:OneDrive,
+        $env:OneDriveCommercial,
+        $env:OneDriveConsumer
+    ) | Where-Object { $_ -and $_.Trim() -ne "" }
+    foreach ($base in $bases) {
+        $normalized = [System.IO.Path]::GetFullPath($base.TrimEnd('\')).TrimEnd('\')
+        if ($root.Equals($normalized, [StringComparison]::OrdinalIgnoreCase) -or
+            $root.StartsWith($normalized + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return ($root -match '\\OneDrive\\' -or $root -match '\\OneDrive - ')
+}
+
+function Test-CrushOneDriveInstall {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+    return Test-CrushPathUnderOneDrive -Path $ProjectRoot
+}
+
+function Get-CrushLocalInstallDestination {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+    $folderName = Split-Path -Leaf $ProjectRoot
+    if ([string]::IsNullOrWhiteSpace($folderName)) {
+        $folderName = "crush-OS"
+    }
+
+    $candidates = @(
+        [Environment]::GetFolderPath("MyDocuments"),
+        (Join-Path $env:USERPROFILE "Documents")
+    ) | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique
+
+    foreach ($docs in $candidates) {
+        if (-not (Test-Path $docs)) { continue }
+        if (Test-CrushPathUnderOneDrive -Path $docs) { continue }
+        return [System.IO.Path]::GetFullPath((Join-Path $docs $folderName))
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $env:USERPROFILE $folderName))
+}
+
+function Stop-CrushInstallProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+    Stop-Process -Name "livekit-server" -Force -ErrorAction SilentlyContinue
+
+    $rootPattern = [regex]::Escape([System.IO.Path]::GetFullPath($ProjectRoot))
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
+        $cmd = $_.CommandLine
+        if (-not $cmd) { return }
+        $kill = $false
+        if ($_.Name -eq "python.exe") {
+            if ($cmd -match "crush\.(app|setup_app|interfaces\.voice\.agent|kernel\.preflight)") { $kill = $true }
+            elseif ($cmd -match $rootPattern) { $kill = $true }
+        }
+        if ($_.Name -eq "cmd.exe" -and $cmd -match "Temp\\crush") { $kill = $true }
+        if ($kill) {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Milliseconds 400
+}
+
+function Move-CrushInstallToLocal {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+    $source = [System.IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
+    $destination = [System.IO.Path]::GetFullPath($DestinationRoot).TrimEnd('\')
+
+    if ($source.Equals($destination, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Source and destination paths are identical."
+    }
+    if ($destination.StartsWith($source + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Destination cannot be inside the current install folder."
+    }
+
+    Stop-CrushInstallProcesses -ProjectRoot $source
+
+    if (Test-Path $destination) {
+        $existing = Get-ChildItem -Path $destination -Force -ErrorAction SilentlyContinue
+        if ($existing -and $existing.Count -gt 0) {
+            $destination = "${destination}-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+        }
+    }
+
+    $parent = Split-Path -Parent $destination
+    if (-not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    Write-Host ""
+    Write-Host "  Deplacement en cours..." -ForegroundColor Yellow
+    Write-Host "    $source" -ForegroundColor DarkGray
+    Write-Host "    -> $destination" -ForegroundColor DarkGray
+    Write-Host ""
+
+    $robocopy = Start-Process -FilePath "robocopy.exe" -ArgumentList @(
+        "`"$source`"", "`"$destination`"", "/E", "/MOVE", "/XJ", "/R:2", "/W:2",
+        "/NFL", "/NDL", "/NJH", "/NJS", "/nc", "/ns", "/np"
+    ) -Wait -PassThru -NoNewWindow
+
+    if ($robocopy.ExitCode -ge 8) {
+        throw "Robocopy failed with exit code $($robocopy.ExitCode)."
+    }
+
+    # robocopy /MOVE a deja supprime ce qu'il a copie ; il ne reste normalement que
+    # le dossier racine vide. S'il reste du CONTENU, ce sont precisement les fichiers
+    # que robocopy n'a pas deplaces — les supprimer en silence, c'est les perdre.
+    if (Test-Path $source) {
+        $leftovers = @(Get-ChildItem -Path $source -Force -Recurse -ErrorAction SilentlyContinue)
+        if ($leftovers.Count -eq 0) {
+            Remove-Item -Path $source -Recurse -Force -ErrorAction SilentlyContinue
+        } else {
+            Write-Host ""
+            Write-Host "  $($leftovers.Count) element(s) n'ont pas pu etre deplaces et restent dans :" -ForegroundColor Yellow
+            Write-Host "    $source" -ForegroundColor DarkGray
+            Write-Host "  Verifie ce qu'il reste avant de supprimer ce dossier toi-meme." -ForegroundColor DarkGray
+            Write-Host ""
+        }
+    }
+
+    return $destination
+}
+
+function Show-CrushOneDriveManualInstructions {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$SuggestedDestination
+    )
+    Write-Host ""
+    Write-Host "  Deplacement manuel :" -ForegroundColor White
+    Write-Host "    1. Ferme cette fenetre et tout process Crush en cours." -ForegroundColor DarkGray
+    Write-Host "    2. Deplace le dossier complet vers un emplacement local, par exemple :" -ForegroundColor DarkGray
+    Write-Host "         $SuggestedDestination" -ForegroundColor Cyan
+    Write-Host "       ou C:\crush-OS" -ForegroundColor Cyan
+    Write-Host "    3. Relance setup.bat ou run.bat depuis le nouveau dossier." -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  Emplacement actuel (OneDrive) :" -ForegroundColor DarkGray
+    Write-Host "    $ProjectRoot" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+function Invoke-CrushOneDriveGuard {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot,
+        [switch]$NonInteractive,
+        [string]$RelaunchCommand = "setup"
+    )
+    if (-not (Test-CrushOneDriveInstall -ProjectRoot $ProjectRoot)) { return }
+
+    $current = [System.IO.Path]::GetFullPath($ProjectRoot)
+    $destination = Get-CrushLocalInstallDestination -ProjectRoot $ProjectRoot
+
+    Write-Host ""
+    Write-Host "  Crush ne peut pas s'installer depuis OneDrive." -ForegroundColor Red
+    Write-Host "  OneDrive casse les liens symboliques du bundle Python (.venv)." -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  Emplacement detecte :" -ForegroundColor White
+    Write-Host "    $current" -ForegroundColor DarkGray
+    Write-Host ""
+
+    if ($NonInteractive) {
+        Show-CrushOneDriveManualInstructions -ProjectRoot $current -SuggestedDestination $destination
+        exit 1
+    }
+
+    Write-Host "  [1] Deplacer automatiquement vers (recommande) :" -ForegroundColor White
+    Write-Host "      $destination" -ForegroundColor Cyan
+    Write-Host "  [2] Instructions de deplacement manuel" -ForegroundColor White
+    Write-Host "  [Q] Quitter" -ForegroundColor White
+    Write-Host ""
+
+    # Pas de defaut sur Entree : l'option [1] deplace le dossier et supprime la
+    # source, laquelle est dans OneDrive — la suppression se propage donc au cloud
+    # et aux autres machines synchronisees. Un utilisateur qui tape Entree sans
+    # lire ne doit pas declencher ca ; on redemande jusqu'a un choix explicite.
+    $choice = ""
+    while ($choice -notin @("1", "2", "q", "quit")) {
+        $choice = (Read-Host "  Choix [1/2/Q]").Trim().ToLowerInvariant()
+        if ($choice -eq "") {
+            Write-Host "  Tape 1, 2 ou Q." -ForegroundColor DarkGray
+        }
+    }
+    if ($choice -in @("q", "quit")) {
+        Write-Host ""
+        Write-Host "  Installation annulee." -ForegroundColor DarkGray
+        Write-Host ""
+        exit 1
+    }
+
+    if ($choice -eq "2") {
+        Show-CrushOneDriveManualInstructions -ProjectRoot $current -SuggestedDestination $destination
+        exit 1
+    }
+
+    try {
+        $movedTo = Move-CrushInstallToLocal -SourceRoot $current -DestinationRoot $destination
+    } catch {
+        Write-Host ""
+        Write-Host "  Echec du deplacement automatique : $_" -ForegroundColor Red
+        Show-CrushOneDriveManualInstructions -ProjectRoot $current -SuggestedDestination $destination
+        exit 1
+    }
+
+    $launcher = Join-Path $movedTo "crush.ps1"
+    if (-not (Test-Path $launcher)) {
+        Write-Host ""
+        Write-Host "  Deplacement termine mais crush.ps1 introuvable dans $movedTo" -ForegroundColor Red
+        exit 1
+    }
+
+    $cmd = if ([string]::IsNullOrWhiteSpace($RelaunchCommand)) { "setup" } else { $RelaunchCommand }
+
+    Write-Host ""
+    Write-Host "  Deplacement termine." -ForegroundColor Green
+    Write-Host "  Relance de Crush depuis :" -ForegroundColor White
+    Write-Host "    $movedTo" -ForegroundColor Cyan
+    Write-Host ""
+
+    Start-Process -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "`"$launcher`"", $cmd
+    ) -WorkingDirectory $movedTo | Out-Null
+
+    exit 0
+}

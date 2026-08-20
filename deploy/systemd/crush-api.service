@@ -1,0 +1,59 @@
+# Unité systemd — API + UI web de l'assistant.
+#
+# Installée par `scripts/install_pi.sh`, qui substitue __CRUSH_DIR__ et
+# __CRUSH_USER__. Ne pas éditer la copie dans /etc/systemd/system : relancer
+# l'installateur, sinon la prochaine mise à jour écrasera les retouches.
+[Unit]
+Description=Assistant — API et interface web
+Documentation=file://__CRUSH_DIR__/README.md
+# network-online, pas seulement network : au démarrage du Pi, l'interface peut
+# être « up » sans adresse routable. Sans cette attente, le premier appel au
+# LLM part avant que la route par défaut existe et le service redémarre en
+# boucle pendant une minute.
+After=network-online.target
+Wants=network-online.target
+
+# StartLimit* vit dans [Unit], PAS dans [Service] : systemd les y ignore
+# silencieusement (« Unknown key ... ignoring » dans journalctl) et la
+# protection anti-boucle serait inerte. Constaté sur systemd 257 / Debian 13.
+# Au-delà de 5 échecs en 5 min, on arrête d'essayer : une boucle de
+# redémarrage sur une clé d'API invalide brûlerait du quota pour rien.
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=exec
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+
+# On invoque le python du venv directement plutôt que `uv run` : au boot, uv
+# tenterait de re-résoudre les dépendances, ce qui échoue si le réseau n'est
+# pas encore prêt et retarde le démarrage de plusieurs secondes.
+ExecStart=__CRUSH_DIR__/.venv/bin/python -m crush.app
+
+# Le binaire livekit-server est posé dans /usr/local/bin par get.livekit.io.
+Environment=PATH=__CRUSH_DIR__/.venv/bin:/usr/local/bin:/usr/bin:/bin
+# Sorties non tamponnées : sans ça, journalctl n'affiche les logs que par
+# blocs de 8 Ko, ce qui rend le suivi en direct inutilisable.
+Environment=PYTHONUNBUFFERED=1
+# Le socle lit et écrit du texte accentué (mémoire, skills, prompts). On fige
+# l'UTF-8 au lieu de dépendre de la locale du système.
+Environment=PYTHONUTF8=1
+
+Restart=always
+RestartSec=5
+
+# ── Durcissement ─────────────────────────────────────────────────────────────
+# L'assistant exécute des outils, dont `execute_cli`. Ces limites bornent les
+# dégâts d'une commande malveillante issue d'une injection de prompt.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# ProtectHome n'est PAS activé : l'assistant doit pouvoir lire et écrire dans
+# le dossier de l'utilisateur (workspace des missions, fichiers indexés).
+
+[Install]
+WantedBy=multi-user.target

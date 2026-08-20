@@ -1,0 +1,15 @@
+#ifndef KEYPAD_KEYS_PROFILE_H
+#define KEYPAD_KEYS_PROFILE_H
+#define KEYPAD_K1_MODE 0
+#define KEYPAD_K1_MODS 0
+#define KEYPAD_K1_KEY 'a'
+#define KEYPAD_K1_MACRO_DELAY_MS 180
+#define KEYPAD_K1_MACRO_ENTER 1
+static const char KEYPAD_K1_MACRO_TEXT[] = "";
+#define KEYPAD_K2_MODE 0
+#define KEYPAD_K2_MODS 0
+#define KEYPAD_K2_KEY 'b'
+#define KEYPAD_K2_MACRO_DELAY_MS 180
+#define KEYPAD_K2_MACRO_ENTER 1
+static const char KEYPAD_K2_MACRO_TEXT[] = "";
+#endif

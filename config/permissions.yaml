@@ -1,0 +1,35 @@
+# config/permissions.yaml — Whitelist d'auto-installation du Capability Engine (PHASE 5).
+#
+# COQUILLE — Cette whitelist est PRÉSENTE mais INERTE en PHASE 5 MVP :
+# settings.auto_install_whitelisted_enabled est False par défaut, donc le
+# CapabilityEngine ne consulte JAMAIS cette liste pour auto-installer une
+# skill. Toute candidate exige promote() humain via l'endpoint
+# POST /api/skills/lab/{name}/promote, quel que soit le contenu de ce fichier.
+#
+# Cette structure documentée existe pour qu'un futur sous-mouvement
+# (PHASE 5.x, observation séparée) puisse activer l'auto-install après gate=auto
+# UNIQUEMENT pour les domaines listés ici. Tout autre domaine restera dans le
+# flux humain par défaut.
+#
+# Règles non négociables (CDC §8 anti-patterns) :
+#   - Aucune entrée pour INSTALL_PACKAGE ou MODIFY_CORE — ces deux niveaux
+#     d'access_level restent SYSTÉMATIQUEMENT en validation humaine, peu
+#     importe la whitelist.
+#   - Une entrée ne suffit pas : il faut aussi que le gate composite (§9)
+#     renvoie 'auto' sur les trois axes (risque + catégorie + budget).
+#
+# Format (cf. agent/capability_engine.py:Whitelist) :
+#   domains:
+#     - name: "transcription_audio"        # libellé humain
+#       max_access_level: WRITE_LOCAL      # ne JAMAIS dépasser EXECUTE_CODE
+#       allowed_categories:                # catégories ApprovalConfig autorisées
+#         - "agent_mission"
+#       description_must_contain:          # filtres textuels — au moins un doit matcher
+#         - "transcrire"
+#         - "transcribe"
+#         - ".ogg"
+#         - ".wav"
+#
+# En PHASE 5 MVP cette liste est INTENTIONNELLEMENT VIDE.
+
+domains: []

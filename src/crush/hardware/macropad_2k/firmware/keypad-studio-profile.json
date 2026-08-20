@@ -1,0 +1,95 @@
+{
+  "bundleVersion": 2,
+  "activeProfileId": "default",
+  "profiles": [
+    {
+      "id": "default",
+      "name": "Principal",
+      "data": {
+        "version": 1,
+        "workspaceRoot": "C:\\Users\\Puparia\\Documents\\GitHub\\crush-OS\\keypad\\firmware",
+        "device": {
+          "keypadProductId": "keypad_2k_v1",
+          "productName": "Keypad CH552"
+        },
+        "keysOptions": {
+          "debounceMs": 5,
+          "layoutFrAzerty": true,
+          "softwareRapidTrigger": false,
+          "rapidTriggerResetMs": 2
+        },
+        "keys": {
+          "k1RightP1": {
+            "modifiers": [],
+            "hidCode": "KeyA",
+            "label": "A",
+            "mode": "hold",
+            "macroText": "",
+            "macroDelayMs": 180,
+            "macroTapEnter": true
+          },
+          "k2LeftP2": {
+            "modifiers": [],
+            "hidCode": "KeyB",
+            "label": "B",
+            "mode": "hold",
+            "macroText": "",
+            "macroDelayMs": 180,
+            "macroTapEnter": true
+          }
+        },
+        "hardware": {
+          "keyLedsGpio": "P3.4",
+          "keyLedOrder": [
+            1,
+            2
+          ],
+          "edgeLedsGpio": "P3.0",
+          "edgeLedCount": 25,
+          "pcbNote": "Visual left is P2 (K2), visual right is P1 (K1)"
+        },
+        "lighting": {
+          "effect": "static",
+          "keyBrightness": 0.75,
+          "edgeBrightness": 0.75,
+          "keySpeed": 0.6,
+          "edgeSpeed": 0.6,
+          "trigger": "press",
+          "staticKeyColor": "#30ad6c",
+          "staticEdgeColor": "#30ad6c",
+          "keyPixels": [
+            "#00f0ff",
+            "#ff2d95"
+          ],
+          "edgePixels": [
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6",
+            "#8b5cf6"
+          ]
+        }
+      }
+    }
+  ]
+}

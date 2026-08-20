@@ -1,0 +1,35 @@
+# Copyright (C) 2026 Barthélemy Houot
+# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+from crush.interfaces.api.analytics import router as _analytics_router
+from crush.interfaces.api.chat import router as _chat_router
+from crush.interfaces.api.config import router as _config_router
+
+# _log_sink est défini dans http_logs et réexporté ici pour main.py.
+from crush.interfaces.api.logs import _log_sink  # noqa: F401
+from crush.interfaces.api.logs import router as _logs_router
+from crush.interfaces.api.memory import router as _memory_router
+from crush.interfaces.api.proactive import router as _proactive_router
+from crush.interfaces.api.sessions import router as _sessions_router
+from crush.interfaces.api.skills import router as _skills_router
+from crush.interfaces.api.system import router as _system_router
+from crush.interfaces.api.ui import router as _ui_router
+from crush.interfaces.api.vision import router as _vision_router
+
+router = APIRouter()
+router.include_router(_ui_router)
+router.include_router(_logs_router)
+router.include_router(_system_router)
+router.include_router(_sessions_router)
+router.include_router(_memory_router)
+router.include_router(_skills_router)
+router.include_router(_config_router)
+router.include_router(_proactive_router)
+router.include_router(_vision_router)
+router.include_router(_chat_router)
+router.include_router(_analytics_router)

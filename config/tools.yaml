@@ -1,0 +1,47 @@
+# Catalogue des scripts lançables par `run_script`.
+#
+# À quoi sert ce fichier, et pourquoi il n'était pas vide par hasard : il
+# déclare des commandes que l'assistant peut lancer par leur ALIAS, sans que le
+# modèle n'ait à composer une ligne de shell. C'est plus sûr qu'`execute_cli`
+# (la commande est écrite ici, par un humain, une fois pour toutes) et plus
+# lisible à l'oral — « fais un point santé » plutôt qu'une invocation.
+#
+# Format :
+#   alias:
+#     command: ["binaire", "argument", ...]   # exécuté SANS shell
+#     description: "..."                      # lue par le modèle, soigne-la
+#     tier: safe | confirm | reject
+#           safe    = lancé directement
+#           confirm = mis en attente, exige « confirme <alias> »
+#           reject  = toujours refusé (utile pour désactiver sans supprimer)
+#
+# Aucun shell n'est interposé : « | », « > » et « $(...) » n'ont aucun effet,
+# ce sont des arguments littéraux. Les chemins relatifs partent du répertoire
+# de travail du service.
+
+sante_pi:
+  command: ["python3", "scripts/sante_pi.py"]
+  description: >-
+    État matériel de la machine qui héberge l'assistant : température, disque,
+    mémoire, durée de fonctionnement, et alerte de bridage thermique. À lancer
+    quand l'utilisateur demande comment va la Pi, ou si elle chauffe.
+  tier: safe
+
+journal_assistant:
+  command: ["python3", "scripts/journal_assistant.py"]
+  description: >-
+    Anomalies journalisées par l'assistant sur les trente dernières minutes,
+    résumées. À lancer quand l'utilisateur signale un comportement bizarre,
+    une réponse manquante, ou demande s'il y a eu une erreur.
+  tier: safe
+
+sauvegarde_memoire:
+  command: [".venv/bin/python", "scripts/sauvegarde_memoire.py"]
+  description: >-
+    Archive la mémoire de l'assistant (base SQLite en instantané cohérent,
+    fichiers thématiques, sessions, consommation) dans sauvegardes/. Exclut le
+    .env. Conserve les sept dernières. À lancer avant une manipulation risquée,
+    ou périodiquement.
+  # confirm : le script ÉCRIT sur le disque et purge d'anciennes archives.
+  # Rien d'irréversible, mais une sauvegarde se demande, elle ne se subit pas.
+  tier: confirm

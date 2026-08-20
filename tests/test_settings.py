@@ -1,0 +1,32 @@
+# Copyright (C) 2026 Barthélemy Houot
+# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+
+from __future__ import annotations
+
+import pytest
+
+from crush.kernel.settings import Settings
+
+
+def test_settings_load() -> None:
+    """Vérifie que les settings se chargent sans erreur (avec .env du dev)."""
+    s = Settings()
+    assert s.llm_provider in ("api", "local")
+    assert s.port > 0
+    assert s.log_level in ("DEBUG", "INFO", "WARNING", "ERROR")
+
+
+def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Vérifie les défauts déclarés DANS LE CODE, isolés du .env du dev.
+
+    Sans isolation, Settings() lit `.env` (qui définit HOST=0.0.0.0 pour
+    l'usage Tailscale) et l'environnement shell, et écrase les défauts —
+    le test deviendrait dépendant du dev qui le lance.
+    """
+    for var in ("HOST", "PORT", "ANTHROPIC_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    s = Settings(_env_file=None)
+    assert s.host == "127.0.0.1"
+    assert s.port == 8000
+    assert s.anthropic_model == "claude-sonnet-4-6"

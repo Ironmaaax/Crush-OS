@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0e16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Assistant</title>
+<link rel="manifest" href="/mobile/manifest.json">
+<link rel="apple-touch-icon" href="/mobile/icon-192.png">
+<link rel="stylesheet" href="/mobile/style.css">
+</head>
+<body>
+
+<!-- Bandeau de diagnostic : affiche toute erreur JavaScript directement sur la
+     page. Sans lui, une panne de script est invisible sur telephone — il n'y a
+     pas de console a ouvrir. -->
+<div id="erreur" hidden></div>
+
+<header id="barre">
+  <!-- Marque reprise de l'interface bureau : meme police, meme degrade
+       descendant. Le nom vient de window.CRUSH_ASSISTANT_NAME. -->
+  <div id="marque"></div>
+  <span id="etat-lien" class="hors-ligne" title="État de la connexion"></span>
+</header>
+
+<main id="scene">
+  <div id="cadre-orbe">
+    <canvas id="orbe"></canvas>
+    <div id="repli-orbe" hidden aria-hidden="true"></div>
+  </div>
+  <!-- Uniquement ce que DIT l'utilisateur : sans ce retour, une erreur de
+       transcription est invisible et l'assistant repond a cote sans raison
+       apparente. La reponse, elle, reste purement vocale. -->
+  <p id="dit" aria-live="polite"></p>
+</main>
+
+<footer id="pied">
+  <button id="micro" aria-label="Parler">
+    <span class="onde" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" width="34" height="34" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <rect x="9" y="2" width="6" height="12" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v4"/>
+    </svg>
+  </button>
+  <p id="indice">Maintiens pour parler</p>
+</footer>
+
+<!-- Scripts classiques, PAS de module : un module qui echoue a se charger meurt
+     en silence, sans rien afficher. Un script classique remonte son erreur a
+     window.onerror, que le bandeau ci-dessus rend visible. -->
+<script src="/three.min.js"></script>
+<!-- sphereStyle.js DOIT preceder orb.js : ce dernier lit window.SPHERE_STYLE
+     des sa construction (S.RENDER.PIXEL_RATIO_MAX). Sans lui, l'orbe echoue
+     sur « Cannot read properties of undefined (reading 'RENDER') ». C'est
+     l'ordre qu'utilise home.html cote bureau. -->
+<script src="/config/sphereStyle.js"></script>
+<script src="/orb.js"></script>
+<script src="/mobile/app.js"></script>
+</body>
+</html>

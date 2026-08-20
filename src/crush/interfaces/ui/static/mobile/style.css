@@ -1,0 +1,341 @@
+/* La page mobile ne charge pas _shared.css : la police de marque doit y etre
+   declaree a nouveau, sinon le repli sans-serif casse l'identite visuelle. */
+@font-face {
+  font-family: 'Landasans';
+  src: url('/fonts/Landasans-Medium.otf') format('opentype');
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --fond: #0a0e16;
+  --panneau: #121826;
+  --bord: #26304a;
+  --texte: #e8ecf4;
+  --attenue: #8b98ad;
+  --accent: #4ca8e8;
+  --accent-sombre: #04121f;
+  --erreur: #ff8f8f;
+  --erreur-fond: #3b1620;
+  /* Encoches et barre d'accueil : sans ces retraits, le pied de page passe
+     sous la barre système sur iPhone et le micro devient inatteignable. */
+  --haut: env(safe-area-inset-top, 0px);
+  --bas: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  /* 100dvh et non 100vh : sur mobile, vh inclut la barre d'URL rétractable,
+     ce qui décale la mise en page à chaque scroll. */
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  background: var(--fond);
+  color: var(--texte);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/* ── Barre du haut ─────────────────────────────────────────────────────── */
+
+#barre {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: calc(var(--haut) + 10px) 18px 0;
+  z-index: 3;
+  pointer-events: none;   /* la marque ne doit pas voler le geste a l'orbe */
+}
+#barre * { pointer-events: auto; }
+
+/* Marque : meme traitement que `.home-signature .brand` du bureau — degrade
+   vertical decoupe sur le texte, qui s'efface vers le bas. Taille en vw pour
+   suivre la largeur de l'ecran sans deborder. */
+#marque {
+  flex: 1;
+  font: 500 clamp(38px, 13vw, 72px)/1 'Landasans', 'Syne', sans-serif;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  user-select: none;
+  background: linear-gradient(180deg,
+    rgba(220, 232, 255, .30)  0%,
+    rgba(220, 232, 255, .18) 40%,
+    rgba(220, 232, 255, .05) 76%,
+    transparent             100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#etat-lien {
+  margin-top: 14px;
+  flex: 0 0 auto;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  transition: background .3s;
+}
+#etat-lien.hors-ligne { background: #55617a; }
+#etat-lien.erreur { background: var(--erreur); }
+
+
+
+/* ── Scène : l'orbe et les légendes ────────────────────────────────────── */
+
+/* Scene vide : seul l'orbe l'occupe, en fond fixe. Plus de legendes — le
+   retour ecrit a ete retire au profit d'une interface minimaliste. */
+#scene {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 0 24px 4px;
+}
+
+/* Ce que l'utilisateur vient de dire. Apparait en fondu, s'efface quand la
+   reponse commence — presence discrete plutot qu'un fil de conversation. */
+#dit {
+  margin: 0;
+  max-width: 30rem;
+  text-align: center;
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--attenue);
+  text-shadow: 0 2px 14px rgba(10, 14, 22, .95);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .25s ease, transform .25s ease;
+  pointer-events: none;
+}
+#dit.visible { opacity: 1; transform: none; }
+
+/* L'orbe remplit l'ecran, exactement comme `.home-orb-wrap` sur le bureau
+   (`position: absolute; inset: 0`). C'est ce qui fait toute la difference
+   visuelle : la camera se retrouve A L'INTERIEUR de la sphere, ce qui revele
+   les trainees lumineuses courbes. Dans un petit cadre carre, la sphere tient
+   entiere dans le champ, vue de loin, et ces trainees disparaissent. */
+#cadre-orbe {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Le canvas reste manipulable alors que son conteneur ne l'est pas : les
+   legendes et le micro, au-dessus, gardent la priorite au toucher. */
+#orbe { width: 100%; height: 100%; display: block; pointer-events: auto; }
+
+/* Repli sans WebGL : un halo pulsant en CSS pur. Certains navigateurs mobiles
+   en mode économie d'énergie désactivent WebGL — mieux vaut un cercle animé
+   qu'un carré noir. */
+#repli-orbe {
+  position: absolute; inset: 25%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #7cc4f5, #2b6fa8 55%, #0d2137 100%);
+  box-shadow: 0 0 60px rgba(76, 168, 232, .35);
+  animation: respiration 4s ease-in-out infinite;
+}
+@keyframes respiration {
+  0%, 100% { transform: scale(.94); opacity: .82; }
+  50%      { transform: scale(1);   opacity: 1; }
+}
+
+/* Légendes : le dernier échange, lisible d'un coup d'œil sans ouvrir le fil */
+
+/* ── Bandeau d'alerte ──────────────────────────────────────────────────── */
+
+#bandeau {
+  padding: 9px 16px;
+  background: var(--erreur-fond);
+  color: var(--erreur);
+  font-size: .85rem;
+  text-align: center;
+  z-index: 3;
+}
+
+/* ── Pied : saisie + micro ─────────────────────────────────────────────── */
+
+#pied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px calc(var(--bas) + 18px);
+  z-index: 3;
+}
+
+#indice {
+  margin: 0;
+  color: var(--attenue);
+  font-size: .82rem;
+  letter-spacing: .02em;
+  min-height: 1.2em;
+}
+
+/* Bandeau de diagnostic : sans console sur telephone, une erreur JS invisible
+   est indebogable a distance. */
+#erreur {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  padding: calc(var(--haut) + 10px) 14px 10px;
+  background: var(--erreur-fond);
+  color: var(--erreur);
+  border-bottom: 1px solid #6d2233;
+  font-size: .8rem;
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+
+#micro {
+  position: relative;
+  flex: 0 0 auto;
+  width: 86px; height: 86px;
+  border: 0;
+  border-radius: 50%;
+  /* Degrade diagonal plutot qu'un aplat : donne du volume au bouton. */
+  background: linear-gradient(155deg, #6fc0f5 0%, #4ca8e8 46%, #2f7fbd 100%);
+  color: #04121f;
+  display: grid;
+  place-items: center;
+  /* Halo en trois couches : lueur large, ombre portee, et liseré interne clair
+     qui simule une arete eclairee par le haut. */
+  box-shadow:
+    0 0 42px rgba(76, 168, 232, .34),
+    0 10px 26px rgba(4, 12, 24, .55),
+    inset 0 1px 0 rgba(255, 255, 255, .38);
+  transition: transform .14s ease, box-shadow .25s ease, background .25s ease;
+}
+
+/* Anneau exterieur fin : detache le bouton du fond sans l'alourdir. */
+#micro::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(124, 196, 245, .22);
+  pointer-events: none;
+  transition: border-color .25s ease;
+}
+
+#micro:active {
+  transform: scale(.94);
+  box-shadow:
+    0 0 30px rgba(76, 168, 232, .28),
+    0 5px 14px rgba(4, 12, 24, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+#micro[disabled] {
+  background: linear-gradient(155deg, #6b7688 0%, #55617a 100%);
+  box-shadow: 0 6px 18px rgba(4, 12, 24, .45);
+}
+#micro[disabled]::after { border-color: rgba(139, 152, 173, .18); }
+
+#micro.ecoute {
+  background: linear-gradient(155deg, #ff9f9f 0%, #f2706f 48%, #c94a4a 100%);
+  color: #fff;
+  animation: pulsation 1.4s ease-in-out infinite;
+}
+#micro.ecoute::after { border-color: rgba(255, 143, 143, .45); }
+@keyframes pulsation {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 143, 143, .48),
+                0 10px 26px rgba(4, 12, 24, .55),
+                inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(255, 143, 143, 0),
+                0 10px 26px rgba(4, 12, 24, .55),
+                inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+}
+
+/* ── Etat « reflechit » ─────────────────────────────────────────────────
+   Faire tourner l'icone du micro n'avait pas de sens : un microphone ne
+   tourne pas. C'est un ARC qui orbite autour du bouton, comme un indicateur
+   d'activite — l'icone, elle, reste immobile et lisible.
+
+   L'arc est un degrade conique masque en anneau : une seule couche, pas de
+   SVG supplementaire, et le rendu reste net a toutes les densites d'ecran. */
+#micro.reflechit {
+  background: linear-gradient(155deg, #7b8aa3 0%, #55617a 100%);
+  box-shadow: 0 6px 18px rgba(4, 12, 24, .45);
+}
+
+#micro.reflechit::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(124, 196, 245, 0)    0deg,
+    rgba(124, 196, 245, 0)  200deg,
+    rgba(124, 196, 245, .85) 330deg,
+    rgba(190, 226, 250, 1)  360deg
+  );
+  /* Masque en anneau : on ne garde que la couronne exterieure du degrade. */
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation: orbite 1.15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes orbite { to { transform: rotate(360deg); } }
+
+/* L'icone reste fixe mais s'attenue : le bouton est momentanement inerte. */
+#micro.reflechit svg { opacity: .55; transition: opacity .2s; }
+
+/* ── Etat « parle » ─────────────────────────────────────────────────────
+   Registre volontairement calme : deux ondes concentriques qui s'eloignent
+   lentement, decalees d'une demi-periode. Pas de battement rapide — la
+   pulsation nerveuse est reservee a l'ecoute, ou elle signale l'urgence de
+   parler. Ici l'assistant a la parole : l'animation doit accompagner, pas
+   solliciter. */
+#micro.parle {
+  background: linear-gradient(155deg, #8fd0f8 0%, #4ca8e8 50%, #2f7fbd 100%);
+}
+#micro.parle::after { border-color: rgba(143, 208, 248, .4); }
+
+#micro.parle::before,
+#micro.parle .onde {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(124, 196, 245, .55);
+  animation: onde 2.6s cubic-bezier(.22, .61, .36, 1) infinite;
+  pointer-events: none;
+}
+/* Seconde onde decalee : le geste devient continu au lieu de saccade. */
+#micro.parle .onde { animation-delay: 1.3s; }
+
+@keyframes onde {
+  0%   { transform: scale(1);    opacity: .55; }
+  70%  { opacity: .12; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+/* Le micro respire doucement pendant qu'il parle — amplitude faible, pour
+   rester sobre a cote de l'orbe qui, lui, reagit deja au son. */
+#micro.parle svg { animation: respire 2.6s ease-in-out infinite; }
+@keyframes respire {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.07); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Écrans très courts (iPhone SE, paysage) : on rend la main à l'essentiel —
+   l'orbe rétrécit, la réponse se resserre, le micro garde sa taille. */
+@media (max-height: 620px) {
+  }

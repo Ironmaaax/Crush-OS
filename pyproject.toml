@@ -1,0 +1,307 @@
+[project]
+name = "crush-os"
+version = "0.3.2"
+description = "Crush — assistant personnel intelligent vocal temps réel"
+authors = [{ name = "Maxime Song" }]
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "AGPL-3.0-or-later"
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+]
+# ─────────────────────────────────────────────────────────────────────────────
+# CŒUR — doit s'installer sur un Raspberry Pi 5 (aarch64, headless, 24/7).
+#
+# Règle d'admission : une dépendance n'entre ici que si (a) elle a une wheel
+# aarch64 ou est pure-Python, ET (b) elle est nécessaire au socle
+# mémoire / chat / outils / voix. Tout ce qui exige un GPU, un périphérique
+# audio local, un écran ou une compilation longue part en extra.
+#
+# Ce qui a été SORTI du cœur (cf. extras plus bas) et pourquoi :
+#   ultralytics + opencv  → tirent torch : ~2,5 Go installés sur ARM.
+#   face-recognition      → dlib compile depuis les sources (très long sur Pi).
+#   sounddevice           → micro de la machine hôte ; sur un serveur headless
+#                           le micro est celui du navigateur client.
+#   faster-whisper        → STT local ; remplacé par l'API OpenAI côté LiveKit.
+#   bambulabs/hidapi/pyusb→ périphériques USB branchés sur la machine.
+#
+# Ce qui a été SUPPRIMÉ (aucun usage dans le code) :
+#   RealtimeSTT           → zéro import dans src/.
+#   livekit-agents[turn-detector] → extra jamais utilisé, tirait torch +
+#                           transformers pour rien.
+# ─────────────────────────────────────────────────────────────────────────────
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.0",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.32.0",
+    # Config
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.0",
+    # LLM providers
+    "anthropic>=0.40.0",
+    "openai>=1.50.0",
+    "google-genai>=1.0.0",
+    "ollama>=0.4.0",
+    # HTTP client (async only)
+    "httpx>=0.28.0",
+    # Logging
+    "loguru>=0.7.3",
+    # Tools
+    "pyyaml>=6.0.3",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "pillow>=10.0.0",
+    "google-api-python-client>=2.197.0",
+    "google-auth-oauthlib>=1.4.0",
+    "feedparser>=6.0.12",
+    "yt-dlp>=2026.3.17",
+    "numpy>=1.26.0",
+    # Voix — pipeline LiveKit : le navigateur publie son micro dans la room,
+    # l'agent la rejoint. Aucun périphérique audio requis côté serveur.
+    "livekit-agents[deepgram,silero]>=1.5.1",
+    "livekit-plugins-google>=1.5.1",
+    "livekit-plugins-elevenlabs>=1.5.1",
+    "livekit-plugins-openai>=1.5.1",
+    "livekit-plugins-anthropic>=1.5.1",
+    "livekit-api>=1.1.0",
+    # TTS local — ONNX, tourne sur ARM, génère un fichier (pas de carte son).
+    "piper-tts>=1.2.0",
+    # TTS en ligne — voix neuronales Microsoft, gratuit et sans clé. Voix par
+    # défaut ; Piper reste le repli quand le réseau tombe.
+    "edge-tts>=7.0.0",
+    # Recherche sémantique (couche 3 mémoire) — ONNX offline, multilingue
+    "fastembed>=0.4.0",
+    "python-telegram-bot>=21.0",
+    # Musique locale Linux : MPRIS via D-Bus (pur Python, sans binaire système)
+    "jeepney>=0.8.0",
+]
+
+[project.optional-dependencies]
+# Détection d'objets YOLOv8 + OpenCV. Les imports sont lazy : sans cet extra,
+# les outils vision se désactivent proprement au lieu de casser le boot.
+vision = [
+    "ultralytics>=8.0.0",
+    "opencv-python>=4.13.0.92",
+]
+# Reconnaissance faciale (séquence Wake Up). dlib compile depuis les sources.
+face = [
+    "face-recognition>=1.3.0",
+    "opencv-python>=4.13.0.92",
+]
+# Micro / haut-parleur de la machine qui héberge l'assistant : détection de
+# double-clap, STT local. Sans objet sur un serveur headless.
+local-audio = [
+    "sounddevice>=0.5.5",
+    "faster-whisper>=1.1.0",
+]
+# Périphériques USB/HID branchés sur la machine hôte.
+hardware = [
+    "bambulabs-api>=2.6.6",
+    "hidapi>=0.15.0",
+    "pyusb>=1.3.1",
+    "libusb-package>=1.0.26.3",
+]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (déjà activé pré-F — gardé)
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "ANN", # flake8-annotations
+    "ASYNC", # flake8-async
+    "TID", # flake8-tidy-imports (Phase F : interdit `from . import …`
+           # relatifs au-delà du package et bannit certains imports)
+]
+ignore = [
+    "ASYNC240",  # pathlib dans async OK — on est sur asyncio, pas trio/anyio
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Interdit les imports relatifs au-delà du package (RÈGLE 1 du CDC §2.2).
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+# src/crush/interfaces/voice/agent.py (ex-voice_agent.py) contient 13
+# __import__("crush.capabilities.tools.X") en lambdas (CDC §B.2 anticipation
+# des migrations tools). Le namespace allongé fait dépasser E501. Reformatage
+# propre prévu en F.1.3 (ruff TID + I).
+# E402 : `from crush.kernel.paths import PROJECT_ROOT` doit venir après
+# `load_dotenv` qui s'exécute au top — résolu en C avec une vraie composition root.
+"src/crush/interfaces/voice/agent.py" = ["E501", "E402"]
+# src/crush/app.py : le bloc qui force l'encodage UTF-8 de stdout/stderr DOIT
+# s'exécuter avant tout import (sinon une ligne de log non-cp1252 crashe le
+# démarrage sous Windows, cf. crush.ps1 run). Ce code-avant-imports volontaire
+# déclenche E402 sur tous les imports suivants.
+"src/crush/app.py" = ["E402"]
+# tests/test_settings_consumers.py utilise `Any` dans des Spy classes qui
+# capturent des kwargs arbitraires des constructeurs patchés (AsyncOpenAI,
+# AsyncAnthropic, httpx.AsyncClient). Typer ces kwargs précisément demanderait
+# de répliquer leur signature exacte — inutile pour un test gardien.
+"tests/test_settings_consumers.py" = ["ANN401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: tests qui exercent des composants lourds (HTTP middleware réel, Docker backend, vraies connexions réseau). Exclus par 'pytest -m \"not integration\"' — le gate par-commit des Phases B et C (CDC §A.1.5).",
+    "permissions_reelles: le test doit voir le VRAI singleton de permissions, non redirige par la fixture d'isolation de conftest.py.",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crush"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/crush" = "crush"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.11",
+    "import-linter>=2.12",
+    "mypy>=1.13",
+]
+
+[tool.importlinter]
+# `root_packages` (pluriel) — `config/` à la racine est un namespace DATA
+# (JSON/YAML) avec quelques modules Python loaders historiques. On le déclare
+# dans le graphe pour que la RÈGLE 4 puisse interdire son import depuis
+# `crush.*` — sinon `config` reste hors-graphe et la règle est invisible.
+# Cf. F.7 : closure du shim racine survivant à audit_imports + import-linter
+# (3e gate fantôme après C8 et B4a).
+root_packages = ["crush", "config"]
+
+# Le contrat de couches strict (`type = "layers"`) n'exprime pas correctement
+# la topologie du projet (cf. CDC §2.2) parce que :
+#   - `app.py` et `interfaces/voice/agent.py` doivent tous deux appeler
+#     `bootstrap.build()` (2 entry-points = 2 process) ; ils ne sont pas
+#     un layer unique au-dessus des autres ;
+#   - `app.py` doit importer les routers `interfaces.api.*` pour les
+#     monter, mais voice/agent n'a pas besoin de routers ;
+#   - les 4 sous-packages L1 (providers, capabilities, analytics, hardware)
+#     ne s'importent pas entre eux (RÈGLE 2).
+# Solution : 4 contrats `forbidden` qui encodent fidèlement les 3 RÈGLES
+# du CDC + la fermeture explicite du shim racine `config/` (RÈGLE 4).
+# Le "layering" implicite tombe directement de cette table d'interdictions.
+
+[[tool.importlinter.contracts]]
+name = "RÈGLE 1 — Kernel indépendant"
+type = "forbidden"
+source_modules = ["crush.kernel"]
+forbidden_modules = [
+    "crush.engine",
+    "crush.providers",
+    "crush.capabilities",
+    "crush.interfaces",
+    "crush.app",
+    "crush.bootstrap",
+    "crush.analytics",
+    "crush.hardware",
+]
+
+[[tool.importlinter.contracts]]
+name = "RÈGLE 2 — Providers/Capabilities/Analytics/Hardware n'importent que kernel"
+type = "forbidden"
+source_modules = [
+    "crush.providers",
+    "crush.capabilities",
+    "crush.analytics",
+    "crush.hardware",
+]
+forbidden_modules = [
+    "crush.engine",
+    "crush.interfaces",
+    "crush.app",
+    "crush.bootstrap",
+]
+# Résidus connus tolérés : tools plugin instanciés par skills utilisateur
+# sans DI possible, et un type Agent passé en signature. Voir BACKLOG
+# Phase G "fermer RÈGLE 2 strict".
+ignore_imports = [
+    "crush.capabilities.tools.subagent -> crush.engine.agent",
+    "crush.capabilities.tools.subagent -> crush.engine.mission.backends.rpc",
+    "crush.capabilities.tools.subagent -> crush.engine.mission.backend_factory",
+    "crush.capabilities.skills.lab -> crush.engine.mission.docker_executor",
+]
+
+[[tool.importlinter.contracts]]
+name = "RÈGLE 3 — Engine n'importe que kernel"
+type = "forbidden"
+source_modules = ["crush.engine"]
+forbidden_modules = [
+    "crush.providers",
+    "crush.capabilities",
+    "crush.interfaces",
+    "crush.app",
+    "crush.bootstrap",
+    "crush.analytics",
+    "crush.hardware",
+]
+# Plugin Fusion 360 instancié à la demande dans worker_agent quand un step
+# nomme `fusion_360` — l'import est lazy et annoté `# lazy: plugin`.
+ignore_imports = [
+    "crush.engine.mission.worker_agent -> crush.capabilities.tools.fusion",
+]
+
+[[tool.importlinter.contracts]]
+# Le shim racine `config/` est un namespace DATA — JSON/YAML qui restent à la
+# racine du repo (décision Q1). Les loaders Python associés vivent dans
+# `crush.kernel.*` et lisent les fichiers via `kernel.paths.CONFIG_DIR`
+# (absolu). Aucun module sous `crush.*` ne doit importer `config.*` :
+# le `from config.X import …` est l'ancien namespace pré-B.3 qui a survécu
+# trois gates (audit_imports lazy-only, import-linter root_package="crush"
+# uniquement). B9 cold-install l'a attrapé en juin : sur clone neuf, le
+# wheel n'embarque que `src/crush/` et l'app ne boote pas. F.7 ferme.
+name = "RÈGLE 4 — Aucun module sous crush.* n'importe le shim racine `config/`"
+type = "forbidden"
+source_modules = [
+    "crush.kernel",
+    "crush.providers",
+    "crush.capabilities",
+    "crush.analytics",
+    "crush.hardware",
+    "crush.engine",
+    "crush.interfaces",
+    "crush.app",
+    "crush.bootstrap",
+]
+forbidden_modules = ["config"]
+
+[tool.mypy]
+# Scope strict : kernel + test de conformité des Protocols (CDC §F.1.3bis).
+# Le reste du codebase (46k lignes) reste à typer en chantier séparé.
+files = [
+    "src/crush/kernel",
+    "tests/unit/kernel/test_contracts_conformance.py",
+]
+python_version = "3.11"
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+no_implicit_optional = true
+ignore_missing_imports = true

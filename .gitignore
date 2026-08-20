@@ -1,0 +1,78 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+.pytest_cache/
+.ruff_cache/
+
+# ── Environnement — clés API, JAMAIS committées ───────────────
+.env
+
+# ── Fichiers de spécifications / cahiers des charges ─────────
+CRUSH_*.md
+AUDIO_OPTIM.md
+*_devlocal.md
+
+# ── Tokens et credentials OAuth ──────────────────────────────
+config/google_credentials.json
+config/google_gmail_token.json
+config/google_token.json
+config/spotify_token.json
+
+# ── Modèles ML (binaires lourds — à télécharger via install.sh)
+yolov8n.pt
+models/
+.models/
+bundle/
+
+# ── Données personnelles de Crush ───────────────────────────
+memory_data/
+workspace/
+vision_data/faces/
+
+# ── Skills générées par le Lab (artefacts run, regénérables) ─
+skills_data/candidates/
+# ── Skills installés en runtime — distribués via le shop (repo `Crush-skills`
+#    séparé), jamais en dur ici. Un clone neuf n'embarque AUCUN skill par
+#    défaut ; ils se téléchargent via le shop à la demande de l'utilisateur.
+skills_data/installed/
+
+# ── Paramètres locaux Claude Code ────────────────────────────
+.claude/
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+
+# ── Fichiers temporaires ─────────────────────────────────────
+-
+
+# ── SQLite (reconstruisible) ──────────────────────────────────
+*.db
+
+# ── OS / Éditeurs ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+tools/arduino-cli/*
+!tools/arduino-cli/.gitkeep
+
+keypad/firmware/Object File1/
+
+# Etat d'approbation propre a chaque machine, plus suivi par git : chaque
+# decision prise depuis l'interface salissait le depot et faisait partir le
+# prochain pull en conflit. Le code le lit desormais dans memory_data/ et ne
+# reprend celui-ci qu'une fois, pour migrer une installation existante.
+config/approvals.json
+
+# Archives produites par scripts/sauvegarde_memoire.py — la memoire de
+# lassistant, propre a chaque machine et parfois volumineuse.
+sauvegardes/

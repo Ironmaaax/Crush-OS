@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="page-title">Crush — Sphere</title>
+<script>document.getElementById('page-title').textContent = (window.CRUSH_ASSISTANT_NAME || 'Crush') + ' — Sphere';</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: #06080D; overflow: hidden; font-family: 'DM Mono', monospace; }
+canvas { display: block; }
+
+.grain {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 20;
+  opacity: 0.025;
+  filter: url(#grain-filter);
+  background: #888;
+}
+.vignette {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 19;
+  background: radial-gradient(ellipse at center,
+    transparent 40%,
+    rgba(6,8,13,0.5) 70%,
+    rgba(6,8,13,0.9) 100%
+  );
+}
+#state-label {
+  position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 0.45em; text-transform: uppercase;
+  color: rgba(74,158,255,0.5); pointer-events: none; z-index: 30;
+  transition: color 0.5s ease;
+}
+#state-label.thinking  { color: rgba(184,150,62,0.75); }
+#state-label.listening { color: rgba(74,158,255,0.85); }
+#state-label.speaking  { color: rgba(106,184,255,0.75); }
+#hint {
+  position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+  color: rgba(74,158,255,0.18); pointer-events: none; z-index: 30;
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="grain-filter" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="grain"></div>
+<div class="vignette"></div>
+<div id="hint">clic pour changer d'état</div>
+<div id="state-label">IDLE</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+'use strict';
+
+// ─── Renderer ─────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x06080D, 1);
+document.body.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 1, 4000);
+camera.position.set(0, 0, 520);
+
+// ─── Texture factories — WHITE only, color via material.color ─────────────────
+// Baking colors into textures + additive blending = mixed hues. Keep textures
+// pure white-to-transparent so material.color is the single source of truth.
+function makeParticleTex(size = 64) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0,    'rgba(255,255,255,1)');
+  g.addColorStop(0.15, 'rgba(240,240,240,0.88)');
+  g.addColorStop(0.40, 'rgba(180,180,180,0.35)');
+  g.addColorStop(0.70, 'rgba(100,100,100,0.08)');
+  g.addColorStop(1,    'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeGlowTex(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const gr = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  gr.addColorStop(0,    'rgba(255,255,255,0.65)');
+  gr.addColorStop(0.25, 'rgba(220,220,220,0.28)');
+  gr.addColorStop(0.50, 'rgba(160,160,160,0.09)');
+  gr.addColorStop(0.80, 'rgba(80,80,80,0.02)');
+  gr.addColorStop(1,    'rgba(0,0,0,0)');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+// ─── Background glow (stays centered, fixed) ──────────────────────────────────
+const bgGlowMat = new THREE.SpriteMaterial({
+  map: makeGlowTex(512),
+  color: new THREE.Color(0x4A9EFF),
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  opacity: 0.88,
+});
+const bgGlow = new THREE.Sprite(bgGlowMat);
+bgGlow.scale.set(780, 780, 1);
+bgGlow.position.z = -120;
+scene.add(bgGlow);
+
+// ─── Particle sphere group (only particles + plexus rotate) ──────────────────
+const sphereGroup = new THREE.Group();
+scene.add(sphereGroup);
+
+// ─── Fibonacci sphere ─────────────────────────────────────────────────────────
+const R = 150;
+
+function fibSphere(n, radius, radialVariance) {
+  const pos   = new Float32Array(n * 3);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y   = 1 - (i / (n - 1)) * 2;
+    const rho = Math.sqrt(Math.max(0, 1 - y * y));
+    const th  = golden * i;
+    const rv  = 1 + (Math.random() - 0.5) * radialVariance;
+    pos[i*3]   = Math.cos(th) * rho * radius * rv;
+    pos[i*3+1] = y * radius * rv;
+    pos[i*3+2] = Math.sin(th) * rho * radius * rv;
+  }
+  return pos;
+}
+
+// ─── Surface particles ────────────────────────────────────────────────────────
+const N_SURF = 3200;
+const surfBase  = fibSphere(N_SURF, R, 0.12);
+const surfBuf   = surfBase.slice();
+const surfPhase = new Float32Array(N_SURF);
+for (let i = 0; i < N_SURF; i++) surfPhase[i] = Math.random() * Math.PI * 2;
+
+const surfGeo     = new THREE.BufferGeometry();
+const surfPosAttr = new THREE.BufferAttribute(surfBuf, 3);
+surfGeo.setAttribute('position', surfPosAttr);
+
+const surfMat = new THREE.PointsMaterial({
+  size: 3.8, map: makeParticleTex(64),
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, sizeAttenuation: true,
+  color: new THREE.Color(0x4A9EFF), opacity: 0.9,
+});
+sphereGroup.add(new THREE.Points(surfGeo, surfMat));
+
+// ─── Highlight nodes (bright anchor points) ───────────────────────────────────
+const N_NODES = 60;
+const nodeBase = fibSphere(N_NODES, R, 0.04);
+const nodeGeo  = new THREE.BufferGeometry();
+nodeGeo.setAttribute('position', new THREE.BufferAttribute(nodeBase, 3));
+const nodeMat  = new THREE.PointsMaterial({
+  size: 9, map: makeParticleTex(64),
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, sizeAttenuation: true,
+  color: new THREE.Color(0xB0DCFF), opacity: 0.95,
+});
+sphereGroup.add(new THREE.Points(nodeGeo, nodeMat));
+
+// ─── Inner volume haze ────────────────────────────────────────────────────────
+const N_HAZE = 320;
+const hazeBuf = new Float32Array(N_HAZE * 3);
+for (let i = 0; i < N_HAZE; i++) {
+  const th = Math.random() * Math.PI * 2;
+  const ph = Math.acos(2 * Math.random() - 1);
+  const r  = R * (0.15 + Math.random() * 0.60);
+  hazeBuf[i*3]   = r * Math.sin(ph) * Math.cos(th);
+  hazeBuf[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+  hazeBuf[i*3+2] = r * Math.cos(ph);
+}
+const hazeGeo = new THREE.BufferGeometry();
+hazeGeo.setAttribute('position', new THREE.BufferAttribute(hazeBuf, 3));
+const hazeMat = new THREE.PointsMaterial({
+  size: 5, map: makeParticleTex(64),
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, sizeAttenuation: true,
+  color: new THREE.Color(0x2D7DD2), opacity: 0.45,
+});
+sphereGroup.add(new THREE.Points(hazeGeo, hazeMat));
+
+// ─── Core glow sprite ─────────────────────────────────────────────────────────
+const coreMat    = new THREE.SpriteMaterial({
+  map: makeGlowTex(256),
+  color: new THREE.Color(0x4A9EFF),
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, opacity: 0.8,
+});
+const coreSprite = new THREE.Sprite(coreMat);
+coreSprite.scale.set(150, 150, 1);
+sphereGroup.add(coreSprite);
+
+// ─── Plexus lines ─────────────────────────────────────────────────────────────
+// FIX: sample EVENLY across all N_SURF particles so plexus covers full sphere
+const PLEXUS_N   = 720;
+const PLEXUS_D   = 52;   // connection threshold in world units
+const plexusIdx  = [];   // evenly-sampled particle indices
+const step       = Math.floor(N_SURF / PLEXUS_N);
+for (let k = 0; k < PLEXUS_N; k++) plexusIdx.push(k * step);
+
+// Build pairs
+const pairsI = [], pairsJ = [], pairsDist = [];
+for (let a = 0; a < PLEXUS_N; a++) {
+  const i  = plexusIdx[a];
+  const ax = surfBase[i*3], ay = surfBase[i*3+1], az = surfBase[i*3+2];
+  for (let b = a + 1; b < PLEXUS_N; b++) {
+    const j  = plexusIdx[b];
+    const dx = ax - surfBase[j*3];
+    const dy = ay - surfBase[j*3+1];
+    const dz = az - surfBase[j*3+2];
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 < PLEXUS_D * PLEXUS_D) {
+      pairsI.push(i);
+      pairsJ.push(j);
+      pairsDist.push(Math.sqrt(d2));
+    }
+  }
+}
+
+const NL         = pairsI.length;
+const linePosArr = new Float32Array(NL * 6);
+const lineColArr = new Float32Array(NL * 6);
+
+for (let k = 0; k < NL; k++) {
+  const i = pairsI[k], j = pairsJ[k], d = pairsDist[k];
+  linePosArr[k*6]   = surfBase[i*3];   linePosArr[k*6+1] = surfBase[i*3+1]; linePosArr[k*6+2] = surfBase[i*3+2];
+  linePosArr[k*6+3] = surfBase[j*3];   linePosArr[k*6+4] = surfBase[j*3+1]; linePosArr[k*6+5] = surfBase[j*3+2];
+  const alpha = (1 - d / PLEXUS_D) * 0.78;
+  for (let v = 0; v < 2; v++) {
+    lineColArr[k*6+v*3]   = 0.12 * alpha;
+    lineColArr[k*6+v*3+1] = 0.50 * alpha;
+    lineColArr[k*6+v*3+2] = 1.00 * alpha;
+  }
+}
+
+const lineGeo     = new THREE.BufferGeometry();
+const linePosAttr = new THREE.BufferAttribute(linePosArr, 3);
+lineGeo.setAttribute('position', linePosAttr);
+// No vertex colors — color controlled via material.color per state.
+// Switching vertexColors at runtime requires needsUpdate + shader recompile;
+// flat color is simpler and avoids baked-in blue leaking into gold.
+const lineMat  = new THREE.LineBasicMaterial({
+  color: new THREE.Color(0x4A9EFF),
+  vertexColors: false, transparent: true,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+  opacity: 0.55,
+});
+const plexus   = new THREE.LineSegments(lineGeo, lineMat);
+sphereGroup.add(plexus);
+
+// ─── Gold glow (THINKING only) — sprite ──────────────────────────────────────
+const goldGlowMat = new THREE.SpriteMaterial({
+  map: makeGlowTex(256),
+  color: new THREE.Color(0xC89030),
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, opacity: 0,
+});
+const goldGlow = new THREE.Sprite(goldGlowMat);
+goldGlow.scale.set(380, 380, 1);
+scene.add(goldGlow);
+
+// ─── States ───────────────────────────────────────────────────────────────────
+const STATES    = ['IDLE','LISTENING','THINKING','SPEAKING'];
+let stateIdx    = 0;
+let stateT      = 0;
+const CYCLE     = 3.5;
+const stateEl   = document.getElementById('state-label');
+
+function applyStateClass() {
+  const s = STATES[stateIdx].toLowerCase();
+  stateEl.className = s === 'idle' ? '' : s;
+  stateEl.textContent = STATES[stateIdx];
+}
+applyStateClass();
+
+document.addEventListener('click', () => {
+  stateIdx = (stateIdx + 1) % STATES.length;
+  stateT = 0;
+  applyStateClass();
+});
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+  stateT  += dt;
+
+  if (stateT >= CYCLE) {
+    stateIdx = (stateIdx + 1) % STATES.length;
+    stateT   = 0;
+    applyStateClass();
+  }
+
+  const S   = STATES[stateIdx];
+  const t   = elapsed;
+
+  // Fake polyphonic amplitude
+  const amp = 0.45 + 0.55 * Math.abs(
+    Math.sin(t * 6.1) * 0.35 +
+    Math.sin(t * 14.3) * 0.30 +
+    Math.sin(t * 3.7) * 0.35
+  );
+
+  // ── Per-state params ────────────────────────────────────────────────────
+  let rotY        = 0.0025;
+  let breathAmp   = 0.018;
+  let breathFreq  = 0.65;
+  let expand      = 0;
+  let goldOp      = 0;
+  let coreSz      = 150;
+  let coreOp      = 0.78;
+
+  switch (S) {
+    case 'IDLE':
+      surfMat.color.set(0x4A9EFF);
+      nodeMat.color.set(0xB0DCFF);
+      hazeMat.color.set(0x2D7DD2);
+      coreMat.color.set(0x4A9EFF);
+      bgGlowMat.color.set(0x4A9EFF);
+      lineMat.color.set(0x4A9EFF); lineMat.opacity = 0.55;
+      break;
+
+    case 'LISTENING':
+      rotY       = 0.005;
+      breathAmp  = 0.055 * amp;
+      breathFreq = 3.5;
+      expand     = amp * 0.20;
+      coreOp     = 0.85 + amp * 0.15;
+      coreSz     = 150 + amp * 30;
+      surfMat.color.set(0x4A9EFF);
+      nodeMat.color.set(0xB0DCFF);
+      hazeMat.color.set(0x2D7DD2);
+      coreMat.color.set(0x4A9EFF);
+      bgGlowMat.color.set(0x4A9EFF);
+      lineMat.color.set(0x4A9EFF); lineMat.opacity = 0.55 + amp * 0.30;
+      break;
+
+    case 'THINKING':
+      rotY       = 0.014;
+      breathAmp  = 0.022;
+      breathFreq = 1.9;
+      goldOp     = 0.65 + 0.35 * Math.sin(t * 2.8);
+      coreOp     = 0.92;
+      coreSz     = 158 + Math.sin(t * 4) * 10;
+      // Pure gold: HSL 43° = #E8A820 family. Textures are white so no bleed.
+      surfMat.color.set(0xD4920E);
+      nodeMat.color.set(0xFFCC33);
+      hazeMat.color.set(0xA06808);   // haze also gold — kills the blue pollution
+      coreMat.color.set(0xD4920E);
+      bgGlowMat.color.set(0xA07010); // amber background glow
+      lineMat.color.set(0xC8A020); lineMat.opacity = 0.70;
+      break;
+
+    case 'SPEAKING':
+      rotY       = 0.006;
+      breathAmp  = 0.040 * amp;
+      breathFreq = 4.2;
+      expand     = amp * 0.10;
+      coreOp     = 0.88 + amp * 0.12;
+      coreSz     = 148 + amp * 18;
+      surfMat.color.set(0x55CCFF);
+      nodeMat.color.set(0xB0DCFF);
+      hazeMat.color.set(0x2D7DD2);
+      coreMat.color.set(0x55BBFF);
+      bgGlowMat.color.set(0x3A9EFF);
+      lineMat.color.set(0x55CCFF); lineMat.opacity = 0.55 + amp * 0.25;
+      break;
+  }
+
+  // ── Sphere rotation + breathing ──────────────────────────────────────────
+  sphereGroup.rotation.y += rotY;
+  const breathe = 1 + Math.sin(t * breathFreq) * breathAmp;
+  sphereGroup.scale.setScalar(breathe);
+
+  // ── Particle update ──────────────────────────────────────────────────────
+  for (let i = 0; i < N_SURF; i++) {
+    const ph = surfPhase[i];
+    const bx = surfBase[i*3], by = surfBase[i*3+1], bz = surfBase[i*3+2];
+    const len = Math.sqrt(bx*bx + by*by + bz*bz) || 1;
+    const nx = bx/len, ny = by/len, nz = bz/len;
+
+    // Subtle radial drift (sinusoidal, individual phase)
+    const drift = Math.sin(t * 0.38 + ph) * 2.5;
+
+    // Expansion in LISTENING / SPEAKING
+    let r = 1 + expand * (0.55 + 0.45 * Math.sin(ph * 4.1 + t * 1.3));
+
+    // Surface tremor in SPEAKING
+    if (S === 'SPEAKING') {
+      r += Math.sin(t * 24 + ph * 6.3) * amp * 0.10;
+    }
+
+    surfPosAttr.array[i*3]   = bx * r + nx * drift;
+    surfPosAttr.array[i*3+1] = by * r + ny * drift;
+    surfPosAttr.array[i*3+2] = bz * r + nz * drift;
+  }
+  surfPosAttr.needsUpdate = true;
+
+  // ── Plexus follows particles ──────────────────────────────────────────────
+  for (let k = 0; k < NL; k++) {
+    const i = pairsI[k], j = pairsJ[k];
+    linePosArr[k*6]   = surfPosAttr.array[i*3];
+    linePosArr[k*6+1] = surfPosAttr.array[i*3+1];
+    linePosArr[k*6+2] = surfPosAttr.array[i*3+2];
+    linePosArr[k*6+3] = surfPosAttr.array[j*3];
+    linePosArr[k*6+4] = surfPosAttr.array[j*3+1];
+    linePosArr[k*6+5] = surfPosAttr.array[j*3+2];
+  }
+  linePosAttr.needsUpdate = true;
+  lineMat.opacity = lineOp;
+
+  // ── THINKING: particles + plexus turn gold ────────────────────────────────
+  // ── Core sprite ───────────────────────────────────────────────────────────
+  coreMat.opacity = coreOp;
+  coreSprite.scale.setScalar(coreSz);
+
+  // ── Background pulse ─────────────────────────────────────────────────────
+  bgGlowMat.opacity = 0.80 + Math.sin(t * 0.85) * 0.07;
+
+  // ── Gold glow (THINKING ambient) ─────────────────────────────────────────
+  goldGlowMat.opacity = goldOp * 0.32;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

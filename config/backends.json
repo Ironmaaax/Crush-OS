@@ -1,0 +1,11 @@
+{
+  "default_backend": "auto",
+  "ssh": {
+    "host": "",
+    "user": "",
+    "port": 22,
+    "key_path": "",
+    "remote_workdir": "~/crush-workspace"
+  },
+  "remote_provider": "modal"
+}

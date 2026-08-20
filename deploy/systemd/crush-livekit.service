@@ -1,0 +1,33 @@
+# Unité systemd — serveur LiveKit local (WebRTC).
+#
+# À n'activer QUE si LIVEKIT_URL pointe sur cette machine. Avec LiveKit Cloud,
+# ce service est inutile — `scripts/install_pi.sh` ne l'active pas dans ce cas.
+[Unit]
+Description=Assistant — serveur LiveKit (WebRTC)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+
+# Mode --dev : clés de développement, pas de TURN, pas de persistance. Correct
+# ici parce que le serveur n'est joignable que depuis le tailnet — il n'est
+# jamais exposé sur Internet. Sur une machine publique, il faudrait un
+# livekit.yaml avec de vraies clés.
+ExecStart=/usr/local/bin/livekit-server --dev --node-ip 127.0.0.1 \
+    --keys "devkey: devsecretdevsecretdevsecretdevsecret"
+
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

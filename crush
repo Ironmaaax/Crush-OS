@@ -1,0 +1,342 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Se place dans le dossier réel du script (résout les symlinks) pour que
+# `crush run` marche depuis n'importe où.
+_SCRIPT="$(readlink -f "$0" 2>/dev/null || python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$0")"
+cd "$(dirname "$_SCRIPT")"
+
+case "${1:-}" in
+  eclosion) bash setup.sh ;;
+  api)      uv run python -m crush.app ;;
+  voice)    uv run python -m crush.interfaces.voice.agent dev ;;
+  livekit)
+    bash scripts/ensure_livekit.sh
+    livekit-server --dev --node-ip 127.0.0.1 --keys "devkey: devsecretdevsecretdevsecretdevsecret" ;;
+  run|start)
+    # Auto-provision : installe livekit-server s'il manque (no-op s'il est déjà là).
+    bash scripts/ensure_livekit.sh || {
+      printf "\n  \033[91m●\033[0m  LiveKit indisponible — voir les instructions ci-dessus.\n\n"
+      exit 1
+    }
+    exec /usr/bin/env bash --noprofile --norc -c '
+      # ── Styles ────────────────────────────────────────────────────
+      R="\033[0m"; B="\033[1m"
+      CY="\033[38;2;0;212;255m"
+      TL="\033[38;2;0;255;180m"
+      GY="\033[38;2;120;130;150m"
+      DG="\033[38;2;70;80;95m"
+      WH="\033[38;2;220;230;255m"
+      YL="\033[93m"; RD="\033[91m"
+      CLEAR_LINE="\033[1A\033[2K"
+
+      _row_wait() { printf "  ${YL}●${R}  ${B}%-8s${R}  ${GY}%s${R}\n" "$1" "$2"; }
+      _row_ok()   { printf "  ${TL}●${R}  ${B}%-8s${R}  ${GY}%s${R}\n" "$1" "$2"; }
+      _row_err()  { printf "  ${RD}●${R}  ${B}%-8s${R}  ${RD}%s${R}\n" "$1" "$2"; }
+
+      _header() {
+        printf "\n"
+        printf "  ${CY}${B}J · A · R · V · I · S${R}\n"
+        printf "  ${DG}activation système${R}\n"
+        printf "  ${DG}─────────────────────────────────────────────${R}\n"
+        printf "\n"
+      }
+
+      _banner() {
+        printf "\n"
+        printf "  ${DG}─────────────────────────────────────────────${R}\n"
+        printf "  ${TL}${B}✓  Crush prêt${R}\n"
+        printf "\n"
+        printf "  ${WH}→${R} ${B}http://localhost:8000${R}      ${GY}interface${R}\n"
+        printf "  ${WH}→${R} ${GY}clique sur le micro pour le mode vocal${R}\n"
+        printf "  ${WH}→${R} ${GY}Ctrl-C pour arrêter${R}\n"
+        printf "  ${DG}─────────────────────────────────────────────${R}\n"
+        printf "  ${DG}Logs détaillés : /tmp/crush/{livekit,api,voice}.log${R}\n"
+        printf "\n"
+      }
+
+      _header
+
+      # ── Cleanup ports + anciens process ──────────────────────────
+      pkill -f "livekit-server" 2>/dev/null || true
+      pkill -f "crush.interfaces.voice.agent" 2>/dev/null || true
+      pkill -f "voice_agent.py" 2>/dev/null || true  # legacy shim, à retirer post-refonte
+      for _p in 7880 7881 8000; do
+        _pid=$(lsof -nP -iTCP:$_p -sTCP:LISTEN -t 2>/dev/null || true)
+        [ -n "$_pid" ] && kill -9 $_pid 2>/dev/null || true
+      done
+      sleep 0.3
+
+      _pids=()
+      _cleanup() {
+        printf "\n  ${GY}arrêt en cours...${R}\n"
+        for p in "${_pids[@]}"; do kill "$p" 2>/dev/null; done
+        wait 2>/dev/null
+        printf "  ${TL}●${R}  ${GY}Crush arrêté${R}\n\n"
+        exit 0
+      }
+      trap _cleanup INT TERM EXIT
+
+      _wait_http() {
+        local url="$1" max="${2:-60}" i=0
+        while [ $i -lt $max ]; do
+          curl -fsS -o /dev/null --max-time 1 "$url" 2>/dev/null && return 0
+          sleep 0.3; i=$((i+1))
+        done
+        return 1
+      }
+
+      _wait_grep() {
+        local file="$1" pattern="$2" max="${3:-60}" i=0
+        while [ $i -lt $max ]; do
+          [ -f "$file" ] && grep -q "$pattern" "$file" 2>/dev/null && return 0
+          sleep 0.3; i=$((i+1))
+        done
+        return 1
+      }
+
+      mkdir -p /tmp/crush
+      LK_LOG=/tmp/crush/livekit.log
+      API_LOG=/tmp/crush/api.log
+      VOICE_LOG=/tmp/crush/voice.log
+      : > "$LK_LOG"; : > "$API_LOG"; : > "$VOICE_LOG"
+
+      # 1) LiveKit
+      _row_wait "LiveKit" "démarrage..."
+      livekit-server --dev --node-ip 127.0.0.1 \
+        --keys "devkey: devsecretdevsecretdevsecretdevsecret" > "$LK_LOG" 2>&1 &
+      _pids+=($!)
+      if _wait_http "http://127.0.0.1:7880/" 40; then
+        printf "$CLEAR_LINE"; _row_ok "LiveKit" "ws://localhost:7880"
+      else
+        printf "$CLEAR_LINE"; _row_err "LiveKit" "le serveur LiveKit n a pas demarre"
+        printf "  ${DG}--- dernieres lignes de %s ---${R}\n" "$LK_LOG"
+        tail -n 15 "$LK_LOG" 2>/dev/null | sed "s/^/  /"
+        printf "  ${DG}Causes frequentes : port 7880 occupe, ou livekit-server absent (crush livekit).${R}\n\n"
+        exit 1
+      fi
+
+      # Préflight : vérifie l environnement (deps natives, .env, port) et explique
+      # clairement tout probleme AVANT de tenter de lancer l API (evite le timeout opaque).
+      if ! uv run python -m crush.kernel.preflight; then
+        exit 1
+      fi
+
+      # 2) FastAPI
+      _row_wait "API" "démarrage..."
+      uv run python -m crush.app > "$API_LOG" 2>&1 &
+      _pids+=($!)
+      if _wait_http "http://127.0.0.1:8000/health" 90; then
+        printf "$CLEAR_LINE"; _row_ok "API" "http://localhost:8000"
+      else
+        printf "$CLEAR_LINE"; _row_err "API" "l API n a pas demarre (ce n est PAS l API LLM)"
+        # La vraie erreur est dans le log (crash au demarrage : dep native
+        # manquante, .env invalide, port 8000 occupe...). On l affiche direct.
+        printf "  ${DG}--- dernieres lignes de %s ---${R}\n" "$API_LOG"
+        tail -n 20 "$API_LOG" 2>/dev/null | sed "s/^/  /"
+        printf "\n"
+        exit 1
+      fi
+
+      # 3) Voice worker (prewarm = ~10s pour charger Silero VAD + plugins)
+      _row_wait "Vocal" "préchauffement (~10s)..."
+      PYTHONWARNINGS=ignore uv run python -m crush.interfaces.voice.agent dev --log-level info > "$VOICE_LOG" 2>&1 &
+      _pids+=($!)
+      if _wait_grep "$VOICE_LOG" "Crush vocal prêt" 90; then
+        printf "$CLEAR_LINE"; _row_ok "Vocal" "prêt"
+      else
+        printf "$CLEAR_LINE"; _row_err "Vocal" "préchauffement long ou échec"
+        printf "  ${DG}--- dernieres lignes de %s ---${R}\n" "$VOICE_LOG"
+        tail -n 10 "$VOICE_LOG" 2>/dev/null | sed "s/^/  /"
+        printf "\n"
+      fi
+
+      _banner
+
+      # Stream live filtré : on garde lessentiel (loguru INFO/WARN/ERROR
+      # de main.py, événements voice agent) et on coupe le bruit.
+      tail -F -n 0 "$VOICE_LOG" "$API_LOG" 2>/dev/null \
+        | grep --line-buffered -vE \
+            "objc\[|pkg_resources|Using selector|Watching|plugin registered|HTTP server listening|starting worker|registered worker|^[[:space:]]*$" &
+      _pids+=($!)
+
+      wait
+    '
+    ;;
+  doctor)
+    uv run python3 - <<'PYEOF'
+import sys, os, subprocess, urllib.request, urllib.error
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def load_env(path=".env"):
+    env = {}
+    try:
+        for line in Path(path).read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            env[k.strip()] = v.strip()
+    except FileNotFoundError:
+        pass
+    return env
+
+ENV = load_env()
+def e(k): return ENV.get(k) or os.environ.get(k, "")
+
+# ANSI
+R  = "\033[0m";  B  = "\033[1m";  D  = "\033[2m"
+CY = "\033[96m"; GR = "\033[32m"; YL = "\033[33m"; RD = "\033[31m"
+DOT = {"ok": GR+"●"+R, "warning": YL+"●"+R, "error": RD+"●"+R}
+
+def http_get(url, headers=None, timeout=6):
+    req = urllib.request.Request(url, headers=headers or {})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.status
+
+def check_fastapi():
+    port = e("PORT") or "8000"
+    try:
+        s = http_get(f"http://localhost:{port}/health")
+        return ("ok", f"En ligne · :{port}") if s < 400 else ("error", f"HTTP {s}")
+    except: return ("warning", f"Serveur eteint · port {port}")
+
+def check_anthropic():
+    key = e("ANTHROPIC_API_KEY")
+    if not key: return ("warning", "API key manquante")
+    try:
+        s = http_get("https://api.anthropic.com/v1/models",
+                     {"x-api-key": key, "anthropic-version": "2023-06-01"})
+        return ("ok", e("ANTHROPIC_MODEL") or "claude-sonnet-4-6") if s == 200 else ("error", f"HTTP {s}")
+    except: return ("error", "Inaccessible")
+
+def check_elevenlabs():
+    key = e("ELEVENLABS_API_KEY")
+    if not key: return ("warning", "API key manquante")
+    try:
+        s = http_get("https://api.elevenlabs.io/v1/user", {"xi-api-key": key})
+        return ("ok", e("ELEVENLABS_MODEL") or "—") if s == 200 else ("error", f"HTTP {s}")
+    except: return ("error", "Inaccessible")
+
+def check_deepgram():
+    key = e("DEEPGRAM_API_KEY")
+    if not key: return ("warning", "API key manquante")
+    try:
+        s = http_get("https://api.deepgram.com/v1/projects",
+                     {"Authorization": f"Token {key}"})
+        return ("ok", "Nova-2") if s == 200 else ("error", f"HTTP {s}")
+    except: return ("error", "Inaccessible")
+
+def check_livekit():
+    import shutil
+    if not shutil.which("livekit-server"):
+        return ("warning", "binaire absent · 'crush run' l'installe auto")
+    try:
+        http_get("http://localhost:7880/")
+        return ("ok", "installe · serveur en ligne")
+    except:
+        return ("ok", "installe · serveur eteint")
+
+def check_mapbox():
+    t = e("MAPBOX_TOKEN")
+    return ("ok", "Token present") if t else ("warning", "MAPBOX_TOKEN manquante")
+
+def check_docker():
+    try:
+        r = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
+        return ("ok", "Disponible") if r.returncode == 0 else ("error", "Non disponible")
+    except FileNotFoundError: return ("error", "Non installe")
+    except: return ("error", "Erreur")
+
+def check_memory():
+    p = Path("memory_data/topics")
+    n = len(list(p.glob("*.md"))) if p.exists() else 0
+    return ("ok", f"{n} topics")
+
+def check_skills():
+    p = Path("skills_data/installed")
+    n = len([d for d in p.iterdir() if d.is_dir()]) if p.exists() else 0
+    return ("ok", f"{n} installes")
+
+def check_proactive():
+    port = e("PORT") or "8000"
+    try:
+        s = http_get(f"http://localhost:{port}/api/proactive/status")
+        return ("ok", "Actif") if s == 200 else ("warning", "Serveur eteint")
+    except: return ("warning", "Serveur eteint")
+
+CHECKS = [
+    ("fastapi",    "FastAPI",         check_fastapi),
+    ("anthropic",  "Anthropic",       check_anthropic),
+    ("elevenlabs", "ElevenLabs",      check_elevenlabs),
+    ("deepgram",   "Deepgram",        check_deepgram),
+    ("livekit",    "LiveKit",         check_livekit),
+    ("mapbox",     "Mapbox",          check_mapbox),
+    ("docker",     "Docker",          check_docker),
+    ("memory",     "Memoire",         check_memory),
+    ("skills",     "Skills",          check_skills),
+    ("proactive",  "ProactiveEngine", check_proactive),
+]
+
+ICONS = {"ok": GR+"●"+R, "warning": YL+"●"+R, "error": RD+"✗"+R}
+
+TITLE = "J·A·R·V·I·S  ─  diagnostic système"
+IW    = len(TITLE) + 8
+
+# Spinner
+sys.stdout.write(f"\n  {D}scanning...{R}")
+sys.stdout.flush()
+
+results = {}
+with ThreadPoolExecutor(max_workers=6) as pool:
+    futures = {pool.submit(fn): key for key, _, fn in CHECKS}
+    for fut in as_completed(futures):
+        key = futures[fut]
+        try: results[key] = fut.result()
+        except Exception as exc: results[key] = ("error", str(exc))
+
+sys.stdout.write("\033[2K\r")
+sys.stdout.flush()
+
+# ── Header ────────────────────────────────────────────────────────────────────
+print(f"  {CY}╭{'─' * IW}╮{R}")
+print(f"  {CY}│{R}    {B}{TITLE}{R}    {CY}│{R}")
+print(f"  {CY}╰{'─' * IW}╯{R}")
+print()
+
+# ── Checks ────────────────────────────────────────────────────────────────────
+for key, label, _ in CHECKS:
+    status, detail = results.get(key, ("error", "—"))
+    icon = ICONS.get(status, ICONS["error"])
+    print(f"  {icon}  {B}{label:<18}{R}  {D}{detail}{R}")
+
+# ── Footer ────────────────────────────────────────────────────────────────────
+overall = "ok" if all(results.get(k, ("error",))[0] == "ok" for k, _, _ in CHECKS) else "degraded"
+ok_n  = sum(1 for k, _, _ in CHECKS if results.get(k, ("error",))[0] == "ok")
+bad_n = len(CHECKS) - ok_n
+
+print()
+print(f"  {D}{'─' * IW}{R}")
+if overall == "ok":
+    print(f"  {GR}{B}  ✓  tous les systèmes sont opérationnels{R}")
+else:
+    s = "s" if bad_n > 1 else ""
+    print(f"  {YL}{B}  ⚠  {ok_n}/{len(CHECKS)} opérationnels  ─  {bad_n} alerte{s} détectée{s}{R}")
+print()
+PYEOF
+    ;;
+  *)
+    echo ""
+    echo "  Usage : crush <commande>"
+    echo ""
+    echo "    run        —  démarre tout (LiveKit + API + Voice)"
+    echo "    api        —  démarre le serveur FastAPI uniquement"
+    echo "    voice      —  démarre le pipeline vocal uniquement"
+    echo "    livekit    —  démarre le serveur LiveKit local"
+    echo "    eclosion   —  installation et configuration"
+    echo "    doctor     —  diagnostic des composants"
+    echo ""
+    exit 1
+    ;;
+esac

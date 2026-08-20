@@ -1,0 +1,27 @@
+# Auteurs
+
+## Ce fork
+
+**Maxime Song** — auteur et mainteneur de ce fork.
+
+Conçu et développé ici : le pipeline vocal (transcription, synthèse
+progressive, réflexion sélective), le suivi et le plafonnement des coûts, la
+persistance des permissions et des approbations, le durcissement du banc
+d'essai des compétences, l'arbitrage des suggestions proactives, la page
+Écosystème, le plafond de chargements cartographiques, l'agent de pilotage de
+poste, et la reprise de l'ensemble des outils.
+
+## Projet d'origine
+
+Ce dépôt dérive de **jarvis-OS** — https://github.com/Grominet95/jarvis-OS
+
+**Barthélemy Houot** (Grominet95) — auteur du projet d'origine, dont ce fork
+reprend l'architecture en couches, le noyau mémoire, le moteur de missions et
+l'interface.
+
+Contributeurs de l'amont : tabasko78, vinc1, XAV59213, rize.
+
+Le code d'origine reste sous licence GNU AGPL-3.0-or-later, et ce fork avec
+lui. Les fichiers portent le nom de leurs auteurs respectifs : ceux écrits
+pour ce fork le nom de son auteur, ceux repris de l'amont les deux quand ils
+ont été modifiés ici.
