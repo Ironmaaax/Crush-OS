@@ -1178,8 +1178,8 @@
     // ── Métadonnées ───────────────────────────────────────────
     const meta = el("dl", { class: "about2-meta" });
     [
-      ["Auteur",  "Barthélemy Houot"],
-      ["Licence", "GNU AGPL-3.0"],
+      ["Auteur",  "Max Ea"],
+      [" ", "GNU AGPL-3.0"],
       ["Année",   String(year)],
     ].forEach(([k, v]) => {
       meta.appendChild(el("dt", { class: "about2-dt", text: k }));
@@ -1201,7 +1201,7 @@
 
     // ── Copyright ─────────────────────────────────────────────
     wrap.appendChild(el("p", { class: "about2-copy",
-      text: `© ${year} Barthélemy Houot · GNU AGPL-3.0` }));
+      text: `© ${year} Max Ea · GNU AGPL-3.0` }));
 
     // ── Bouton mise à jour ────────────────────────────────────
     const updateBtn = el("button", { class: "about2-update-btn", text: "Vérifier les mises à jour" });

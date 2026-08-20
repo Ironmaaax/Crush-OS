@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests — cohérence du mode local (Ollama) hors-ligne."""
@@ -161,7 +161,7 @@ async def test_cross_session_recall_offline_skips_llm(local_mode: None) -> None:
 
     fts_mock = MagicMock()
     fts_mock.search = AsyncMock(
-        return_value=[{"doc_id": "s1", "text": "Barth aime l'électronique"}]
+        return_value=[{"doc_id": "s1", "text": "Max aime l'électronique"}]
     )
     vec_mock = MagicMock()
     vec_mock.search = AsyncMock(return_value=[])
@@ -171,7 +171,7 @@ async def test_cross_session_recall_offline_skips_llm(local_mode: None) -> None:
 
     mock_llm.complete.assert_not_called()
     assert result is not None
-    assert "Barth" in result
+    assert "Max" in result
 
 
 @pytest.mark.asyncio
@@ -182,7 +182,7 @@ async def test_cross_session_recall_online_calls_llm(api_mode: None) -> None:
 
     fts_mock = MagicMock()
     fts_mock.search = AsyncMock(
-        return_value=[{"doc_id": "s1", "text": "Barth aime l'électronique"}]
+        return_value=[{"doc_id": "s1", "text": "Max aime l'électronique"}]
     )
     vec_mock = MagicMock()
     vec_mock.search = AsyncMock(return_value=[])

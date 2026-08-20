@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests d'AutoDream deep ingest batch (MOUVEMENT 2 option D).
@@ -8,7 +8,7 @@ Vérifie :
 - _list_recent_session_files renvoie les N plus récentes triées par mtime
   croissant (la plus ancienne d'abord pour que le dédoublonnage intra-batch
   fonctionne via le matcher v2).
-- _session_to_text concatène les messages JSONL en 'Barth : / Crush :' et
+- _session_to_text concatène les messages JSONL en 'Max : / Crush :' et
   tronque au tail si > 8000 chars.
 - _ingest_recent_sessions appelle ingest UNE FOIS par session entière, jamais
   par message individuel.
@@ -94,7 +94,7 @@ def _write_session(sessions_dir: Path, session_id: str, lines: list[tuple[str, s
 
 def _fact(predicate: str = "prefers", obj: str = "python", category: str = "tool") -> dict:
     return {
-        "subject": "Barth",
+        "subject": "Max",
         "predicate": predicate,
         "object": obj,
         "category": category,
@@ -115,12 +115,12 @@ def test_session_to_text_format_alternance(tmp_path: Path) -> None:
     path = _write_session(
         tmp_path / "sess",
         "s1",
-        [("user", "Bonjour"), ("assistant", "Salut Barth"), ("user", "Comment vas-tu ?")],
+        [("user", "Bonjour"), ("assistant", "Salut Max"), ("user", "Comment vas-tu ?")],
     )
     text = AutoDream._session_to_text(path)
-    assert "Barth : Bonjour" in text
-    assert "Crush : Salut Barth" in text
-    assert "Barth : Comment vas-tu ?" in text
+    assert "Max : Bonjour" in text
+    assert "Crush : Salut Max" in text
+    assert "Max : Comment vas-tu ?" in text
 
 
 def test_session_to_text_ignore_lignes_vides_et_json_invalide(tmp_path: Path) -> None:
@@ -134,7 +134,7 @@ def test_session_to_text_ignore_lignes_vides_et_json_invalide(tmp_path: Path) ->
         encoding="utf-8",
     )
     text = AutoDream._session_to_text(path)
-    assert "Barth : hello" in text
+    assert "Max : hello" in text
     assert "Crush : world" in text
     assert text.count("\n") == 1  # 2 lignes utilisables seulement
 

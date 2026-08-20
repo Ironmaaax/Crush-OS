@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests PHASE 0 — contrat de schémas partagés (§3).
@@ -280,7 +280,7 @@ def test_event_roundtrip() -> None:
 def test_fact_roundtrip() -> None:
     fact = Fact(
         id="fact_001",
-        subject="Barth",
+        subject="Max",
         predicate="prefers",
         object="Python",
         category="tool",
@@ -342,7 +342,7 @@ def test_fact_predicate_hors_vocab_non_bloque_construction_mais_detectable() -> 
     """
     fact = Fact(
         id="fact_bad",
-        subject="Barth",
+        subject="Max",
         predicate="vise",  # hors vocabulaire
         object="sub-3h",
         category="goal",
@@ -356,7 +356,7 @@ def test_fact_predicate_hors_vocab_non_bloque_construction_mais_detectable() -> 
 def test_fact_category_hors_vocab_non_bloque_construction_mais_detectable() -> None:
     fact = Fact(
         id="fact_bad_cat",
-        subject="Barth",
+        subject="Max",
         predicate="prefers",
         object="café",
         category="boisson",  # hors vocabulaire

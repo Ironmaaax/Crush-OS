@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -209,7 +209,7 @@ class Settings(BaseSettings):
     )
     skills_dir: str = Field(
         default="skills",
-        description="Répertoire racine des skills OpenClaw/ClawHub.",
+        description="Répertoire racine des skills.",
     )
     skills_catalog_repo: str = Field(
         default="Ironmaaax/Crush-skills",
@@ -661,8 +661,8 @@ class Settings(BaseSettings):
 
     @property
     def display_name(self) -> str:
-        """Prénom à utiliser dans les prompts. Repli sur 'Barth' si non configuré."""
-        return (self.user_firstname or "").strip() or "Barth"
+        """Prénom à utiliser dans les prompts. Repli sur 'Max' si non configuré."""
+        return (self.user_firstname or "").strip() or "Max"
 
     @property
     def display_assistant_name(self) -> str:

@@ -2,7 +2,7 @@
 
 Le CDC v1.3 référence B8 (continuité des données) et B9 (install à froid)
 dans §0.5, F.1.2 et F.3 mais ne donne pas leurs commandes — elles ont été
-rédigées en fin de Phase A et validées par Barth (cf. rapport Phase A et
+rédigées en fin de Phase A et validées par Max (cf. rapport Phase A et
 les trois resserrages reçus avec le « GO PHASE B »).
 
 Ce fichier est la source de vérité de ces deux gates jusqu'à leur

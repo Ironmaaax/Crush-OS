@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """
@@ -239,7 +239,7 @@ def _rectify_system(name: str) -> str:
 
 class InitiativeGenerator:
     def __init__(
-        self, llm: LLMProvider, user_firstname: str = "Barth", user_profile: str = ""
+        self, llm: LLMProvider, user_firstname: str = "Max", user_profile: str = ""
     ) -> None:
         self._llm = llm
         self._name = user_firstname

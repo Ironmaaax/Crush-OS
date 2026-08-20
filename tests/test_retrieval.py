@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests du retrieval (CDC §6.9) — score importance × récence × pertinence × confidence + decay."""
@@ -18,7 +18,7 @@ from crush.providers.memory.schemas import DecayPolicy, Fact, FactStatus, Relati
 
 def _make_fact(
     fid: str,
-    subject: str = "barth",
+    subject: str = "Max",
     predicate: str = "prefers",
     obj: str = "python",
     category: str = "tool",

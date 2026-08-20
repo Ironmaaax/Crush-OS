@@ -1,5 +1,5 @@
 # Copyright (C) 2026 Maxime Song
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests de l'outil `vision` sur une machine sans caméra ni écran.

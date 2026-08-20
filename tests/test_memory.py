@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ def test_session_store_list_recent(tmp_path: Path) -> None:
 def test_memory_index_read(tmp_path: Path) -> None:
     md = tmp_path / "MEMORY.md"
     md.write_text(
-        "# Index\n\n## Utilisateur\n- profile: `topics/user.md` — Barth\n", encoding="utf-8"
+        "# Index\n\n## Utilisateur\n- profile: `topics/user.md` — Max\n", encoding="utf-8"
     )
     idx = MemoryIndex(tmp_path)
     content = idx.read()

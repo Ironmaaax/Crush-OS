@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests de l'endpoint /api/memory/trigger-deep (MOUVEMENT 2 option D).
@@ -64,7 +64,7 @@ def test_trigger_deep_flag_off_court_circuite_avant_lookup_autodream() -> None:
     """Même sans auto_dream injecté, le check du flag passe en premier.
 
     C'est important : le message d'erreur doit pointer le flag, pas un
-    'AutoDream non disponible' qui désorienterait Barth.
+    'AutoDream non disponible' qui désorienterait Max.
     """
     app = FastAPI()
     app.include_router(router)

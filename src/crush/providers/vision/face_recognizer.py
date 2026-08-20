@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """
@@ -22,9 +22,9 @@ from crush.kernel.settings import settings
 
 @dataclass
 class RecognitionResult:
-    recognized: bool  # True si Barth est reconnu
+    recognized: bool  # True si Max est reconnu
     confidence: float  # 0.0-1.0 (1 - distance)
-    name: str  # "barth" ou "unknown"
+    name: str  # "Max" ou "unknown"
     face_locations: list = field(
         default_factory=list)  # Coordonnées (1/4 scale)
 

@@ -169,7 +169,7 @@ Transition vers le dashboard : au `onComplete`, monter le dashboard **sous** la 
 | Prop | Type | Défaut | Rôle |
 |---|---|---|---|
 | `onComplete` | `() => void` | — | entrée en `online` (déclencher le pipeline voix LiveKit ici) |
-| `userName` | `string` | `'BARTH'` | nom affiché à la validation |
+| `userName` | `string` | `'Max'` | nom affiché à la validation |
 | `requireFace` | `boolean` | `true` | `false` = saute la phase FACE |
 | `bootLines` | `string[]` | logs par défaut | lignes de boot (brancher sur /system/health) |
 | `statusLabel` | `string` | `'SYSTÈMES EN LIGNE'` | statut HUD |

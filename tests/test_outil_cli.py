@@ -1,5 +1,5 @@
 # Copyright (C) 2026 Maxime Song
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Audit production : run_script inappelable, whitelist execute_cli héritée de macOS.
@@ -150,9 +150,9 @@ async def test_args_en_chaine_sont_decoupes(tmp_path: Path) -> None:
         return proc
 
     with patch("asyncio.create_subprocess_exec", side_effect=faux_exec):
-        await outil.execute(alias="greet", args="Barth le second")
+        await outil.execute(alias="greet", args="Max le second")
 
-    assert lance["cmd"] == ["echo", "Barth", "le", "second"]
+    assert lance["cmd"] == ["echo", "Max", "le", "second"]
 
 
 async def test_binaire_absent_message_explicite(tmp_path: Path) -> None:

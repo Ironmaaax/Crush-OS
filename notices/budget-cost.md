@@ -4,7 +4,7 @@ Les fichiers `core/budget.py` et les extensions de `agent/project_store.py`
 (claim atomique, pause budgétaire) s'inspirent de l'architecture du projet
 **Paperclip** (https://github.com/paperclipai/paperclip).
 
-## Licence source
+##   source
 
 ```
 MIT License

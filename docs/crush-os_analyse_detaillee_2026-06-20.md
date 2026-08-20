@@ -1,24 +1,19 @@
 # CRUSH-OS — analyse détaillée du projet
 
-> **Date** : 2026-06-20 · **Analyste** : Claude (Vincent Guilbert)
-> **Périmètre** : `/home/vinc1/IdeaProjects/crush-OS` (v0.2.0)
-> **Méthode** : analyse 100 % statique — lecture de code, **aucune exécution** du projet.
-> Recoupée sur 4 explorations parallèles + lecture directe des fichiers d'exécution
-> sensibles + scan CVE des dépendances (via recherche web).
 
 ---
 
-## 0. Avertissement licence (à lire avant de « participer »)
+## 0. Avertissement   (à lire avant de « participer »)
 
-Ce n'est **pas** un projet B+D. C'est le projet personnel de **Barthélemy Houot**
-(`@Grominet95`), sous **Proprietary Source License** (© 2026) :
+Ce n'est **pas** un projet B+D. C'est le projet personnel de **Max Ea**
+(`@ ironmax`), sous **Proprietary Source License** (© 2026) :
 
 - ✅ Autorisé : lire le code (perso / éducatif), l'exécuter en privé.
 - ❌ Interdit sans **accord écrit de l'auteur** : modifier, créer une œuvre dérivée,
   contribuer, redistribuer, héberger pour des tiers, usage commercial.
 
 **Conséquence** : toute contribution suppose d'abord un accord explicite de l'auteur
-(barth.houot@gmail.com). Le reste de ce document suppose cet accord obtenu.
+(Max.Ea@gmail.com). Le reste de ce document suppose cet accord obtenu.
 
 ---
 
@@ -27,7 +22,7 @@ Ce n'est **pas** un projet B+D. C'est le projet personnel de **Barthélemy Houot
 | Champ | Valeur |
 |---|---|
 | Nom | CRUSH-OS (`crush-os`) — assistant personnel IA, texte + voix temps réel, self-hosted |
-| Auteur / licence | Barthélemy Houot — Proprietary Source License |
+| Auteur /   | Max Ea — Proprietary Source License |
 | Version | `0.2.0` (tag `v0.2.0-architecture`), post-refonte « Opération Squelette » |
 | Langage | Python 3.11 (`>=3.11,<3.14`), tout async |
 | Volume | ~34 500 lignes / 220 modules dans `src/crush/` (les docs citent ~46k au total) |

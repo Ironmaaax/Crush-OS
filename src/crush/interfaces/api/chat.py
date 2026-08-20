@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -171,7 +171,7 @@ async def get_voice_token(session_id: str | None = None) -> dict:  # noqa: ARG00
             CreateAgentDispatchRequest(room=room_name, agent_name="crush")
         )
 
-    # Identité du participant = prénom configuré (et plus "barth" en dur), visible
+    # Identité du participant = prénom configuré (et plus "Max" en dur), visible
     # dans les logs LiveKit. Slug minimal (minuscules, sans espaces) ; repli "user".
     identity = (settings.user_firstname or "").strip().lower().replace(" ", "-") or "user"
 

@@ -357,7 +357,7 @@ const easeInOut = (x: number) => x * x * (3 - 2 * x);
 
 export default function WakeSequence({
   onComplete,
-  userName = 'BARTH',
+  userName = 'Max',
   requireFace = true,
   bootLines = DEFAULT_BOOT_LINES,
   statusLabel = 'SYSTÈMES EN LIGNE',

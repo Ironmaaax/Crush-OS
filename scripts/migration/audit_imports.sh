@@ -15,7 +15,7 @@
 # (textwrap.dedent générant des skill.py, f-strings multilignes). Tant que
 # C4 visait « < 15 », ces faux positifs étaient acceptables. À la sortie
 # de C (compteur à 3 dont 3 faux positifs), la dette d'imports différés
-# est nulle ; le gardien permanent doit afficher 0 (cf. décision Barth :
+# est nulle ; le gardien permanent doit afficher 0 (cf. décision Max :
 # « Quand c'est 0, il doit afficher 0 »). Bascule vers un parser AST.
 #
 # Critères INCLUS dans le compteur (cf. audit_imports.py) :

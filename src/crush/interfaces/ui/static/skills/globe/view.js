@@ -9,7 +9,7 @@
   const VIEW_ID = 'globe';
   const MAPBOX_VERSION = '3.23.1';
   const MAPBOX_CDN = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}`;
-  const MAPBOX_STYLE = 'mapbox://styles/barth-95/cmosuocjv007801seho3g8r4y';
+  const MAPBOX_STYLE = 'mapbox://styles/Max-95/cmosuocjv007801seho3g8r4y';
 
   let _motifRefus = '';
   let map = null;

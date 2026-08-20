@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ class AutoDream:
         sessions_dir: Path,
         memory_ingest: MemoryIngest | None = None,
         mirror: MemoryMirror | None = None,
-        user_firstname: str = "Barth",
+        user_firstname: str = "Max",
         assistant_name: str = "Crush",
     ) -> None:
         self._llm = llm
@@ -194,7 +194,7 @@ class AutoDream:
         return files[-_MAX_SESSIONS_PER_DEEP:]
 
     @staticmethod
-    def _session_to_text(path: Path, name: str = "Barth", assistant_name: str = "Crush") -> str:
+    def _session_to_text(path: Path, name: str = "Max", assistant_name: str = "Crush") -> str:
         """Concatène les messages d'une session JSONL en un texte unique.
 
         Format : alternance '<prénom> : ...' / 'Crush : ...'.

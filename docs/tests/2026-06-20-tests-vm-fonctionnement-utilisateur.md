@@ -33,8 +33,6 @@ But : valider le **fonctionnement utilisateur réel** (Q&A, code-agent), pas jus
 - **1er run (sans Docker)** : `failed` à l'étape 1 — `Exécution directe refusée` (`mission/backends/local.py`).
   Le Mission engine exige un backend d'exécution : **Docker** (`DOCKER_ENABLED=true`) ou
   `ALLOW_UNSANDBOXED_EXEC`. Les deux étaient off → toute commande refusée.
-- **Correctif appliqué** : `apt install docker.io`, `vinc1` dans le groupe `docker`,
-  `DOCKER_ENABLED=true`, pré-pull `python:3.11-slim`, relance de Crush dans une session fraîche.
 - **Retry (avec Docker)** : nette progression — 8 appels LLM, étapes 2/3/4 **done**, **5 fichiers créés**
   (`complex_dev_agent.json`, `complex_dev_agent_prompt.txt`, `config.json`, 2 scripts de test).
   L'exécution en sandbox fonctionne (`execute_cli: python3 …` tourne).

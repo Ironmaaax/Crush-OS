@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ class Agent:
 
         # Le prompt est un GABARIT : `{{user}}` et `{{assistant}}` y sont
         # résolus explicitement. L'ancienne version faisait deux `str.replace`
-        # sur les chaînes littérales « Barth » et « Crush » — substitution non
+        # sur les chaînes littérales « Max » et « Crush » — substitution non
         # ancrée, invisible depuis le fichier de prompt, et limitée à ce seul
         # fichier. Un placeholder inconnu lève désormais une erreur au lieu de
         # produire un prompt à moitié rendu.

@@ -273,7 +273,7 @@ uv sync --extra vision
 
 ## Système de mémoire
 
-Crush ne mémorise pas en vrac : il **extrait des faits atomiques** (« Barth vise un marathon sub-3h »), les **date**, les **source** (quel échange l'a produit), les **renforce** quand il les ré-entend, les **archive** quand ils sont contredits, sans jamais les supprimer. Une base SQLite unique est la source de vérité ; un miroir Markdown lisible (compatible Obsidian) en donne une vue inerte.
+Crush ne mémorise pas en vrac : il **extrait des faits atomiques** (« Max vise un marathon sub-3h »), les **date**, les **source** (quel échange l'a produit), les **renforce** quand il les ré-entend, les **archive** quand ils sont contredits, sans jamais les supprimer. Une base SQLite unique est la source de vérité ; un miroir Markdown lisible (compatible Obsidian) en donne une vue inerte.
 
 | Table | Ce qu'elle contient |
 |---|---|
@@ -292,12 +292,12 @@ Tout vit dans `memory_data/` (DB `crush_memory.db`, vault `topics/` lisible, ses
 
 ## Dashboard Monde (World Monitor)
 
-L'onglet **Intel Monde** de l'interface Crush affiche [World Monitor](https://github.com/Grominet95/dashboard_monde), un tableau de bord géopolitique temps réel (globe 3D, flux d'actualités IA, radars financiers, suivi d'infrastructures).
+L'onglet **Intel Monde** de l'interface Crush affiche [World Monitor](https://github.com/ ironmax/dashboard_monde), un tableau de bord géopolitique temps réel (globe 3D, flux d'actualités IA, radars financiers, suivi d'infrastructures).
 
 **Prérequis :** Node.js 18+
 
 ```bash
-git clone https://github.com/Grominet95/dashboard_monde.git
+git clone https://github.com/ ironmax/dashboard_monde.git
 cd dashboard_monde
 npm install
 npm run dev -- --port 3000
@@ -399,18 +399,3 @@ documentés en [`docs/migration/BACKLOG.md`](docs/migration/BACKLOG.md).
 - **uv** : gestion des dépendances
 
 ---
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Ironmaaax/Crush-OS&type=Date)](https://www.star-history.com/?repos=Ironmaaax%2FCrush-OS&type=date&legend=top-left)
-
----
-
-
-## Licence
-
-[GNU Affero General Public License v3.0](./LICENSE) · © 2026 Barthélemy Houot.
-
-CRUSH-OS est un logiciel libre : vous pouvez le redistribuer et/ou le modifier
-selon les termes de l'AGPL-3.0. Si vous le faites tourner sur un serveur accessible
-en réseau, vous devez en proposer le code source aux utilisateurs (clause AGPL §13).

@@ -45,14 +45,14 @@
         }
     ],
     "sources": {},
-    "sprite": "mapbox://sprites/barth-95/cmosu8mdg006u01sf7747cs52/b8fjw435hx85pp7j172f016pl",
+    "sprite": "mapbox://sprites/Max-95/cmosu8mdg006u01sf7747cs52/b8fjw435hx85pp7j172f016pl",
     "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
     "projection": {"name": "globe"},
     "layers": [],
     "created": "2026-05-05T16:23:49.828Z",
     "modified": "2026-05-05T16:50:36.401Z",
     "id": "cmosu8mdg006u01sf7747cs52",
-    "owner": "barth-95",
+    "owner": "Max-95",
     "visibility": "private",
     "protected": true,
     "draft": false

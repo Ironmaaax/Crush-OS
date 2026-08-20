@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Garde-fou : le retry Anthropic ne doit jamais rejouer un flux déjà émis.
@@ -83,9 +83,9 @@ async def test_pas_de_retry_une_fois_un_chunk_emis() -> None:
     """Échec APRÈS le premier token : l'erreur remonte, aucun texte dupliqué."""
     attempts = [
         # 1re tentative : émet "Bonjour" puis casse.
-        _FakeStream(["Bonjour", " Barth"], raise_after=1),
+        _FakeStream(["Bonjour", " Max"], raise_after=1),
         # Ne doit jamais être consommée.
-        _FakeStream(["Bonjour", " Barth"], raise_after=None),
+        _FakeStream(["Bonjour", " Max"], raise_after=None),
     ]
     provider, messages = _provider(attempts)
 
@@ -102,11 +102,11 @@ async def test_retry_si_echec_avant_tout_chunk() -> None:
     """Échec AVANT le premier token : le retry reste légitime et transparent."""
     attempts = [
         _FakeStream([], raise_after=0),
-        _FakeStream(["Bonjour", " Barth"], raise_after=None),
+        _FakeStream(["Bonjour", " Max"], raise_after=None),
     ]
     provider, messages = _provider(attempts)
 
     received = [chunk async for chunk in provider._stream({})]
 
-    assert received == ["Bonjour", " Barth"]
+    assert received == ["Bonjour", " Max"]
     assert messages.call_count == 2, "la seconde tentative doit avoir eu lieu"

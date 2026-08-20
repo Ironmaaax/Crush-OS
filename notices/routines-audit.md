@@ -12,7 +12,7 @@ structure des enregistrements) ont été adaptées en Python.
 ### Paperclip — paperclipai/paperclip
 
 - **URL** : https://github.com/paperclipai/paperclip
-- **Licence** : MIT
+- ** ** : MIT
 - **Commit de référence** : depth-1 clone, 2026-05-29
 - **Concepts repris** :
   - Modèle `Routine` (name, trigger, concurrency_policy, catch_up_policy)
@@ -53,7 +53,7 @@ SOFTWARE.
 ### Hermes Agent — NousResearch/hermes-agent
 
 - **URL** : https://github.com/NousResearch/hermes-agent
-- **Licence** : MIT (voir dépôt)
+- ** ** : MIT (voir dépôt)
 - **Commit de référence** : depth-1 clone (dépôt privé / inaccessible au moment du clone)
 - **Concepts repris** :
   - Idée de cron en langage naturel → implémentée ici via `next_cron_datetime(expr, after)`
@@ -73,4 +73,4 @@ SOFTWARE.
 
 ---
 
-*Crush V3 est un projet personnel — Barth Houot, 2026.*
+*Crush V3 est un projet personnel — Max Ea, 2026.*

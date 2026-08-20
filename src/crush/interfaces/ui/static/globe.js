@@ -72,7 +72,7 @@
 
     _map = new mapboxgl.Map({
       container: 'globe-container',
-      style: 'mapbox://styles/barth-95/cmosuocjv007801seho3g8r4y',
+      style: 'mapbox://styles/Max-95/cmosuocjv007801seho3g8r4y',
       projection: 'globe',
       zoom: 2.5,
       center: [10, 20],

@@ -4,18 +4,18 @@
 
 ### Hermes Agent — NousResearch
 **Dépôt** : https://github.com/NousResearch/hermes-agent  
-**Licence** : MIT  
+** ** : MIT  
 **Copyright** : NousResearch
 
 Le mécanisme de création autonome de skills (« nudges » de persistance après une tâche
 complexe, auto-amélioration à l'usage) est inspiré de l'architecture Hermes Agent.
 
-Patterns réutilisés sous licence MIT :
+Patterns réutilisés sous   MIT :
 - Structure de skill en dossier (`SKILL.md` + scripts optionnels)
 - Déclenchement de la synthèse après une tâche non-triviale
 - Amélioration incrémentale du skill avec de nouvelles expériences
 
-**Texte de la licence MIT :**
+**Texte de la   MIT :**
 
 ```
 MIT License
@@ -46,7 +46,7 @@ SOFTWARE.
 ### Standard agentskills.io
 **Site** : https://agentskills.io  
 **GitHub** : https://github.com/agentskills/agentskills  
-**Licence** : Open Standard (contributions communautaires)  
+** ** : Open Standard (contributions communautaires)  
 **Origine** : Anthropic, ouvert à l'écosystème
 
 Le format `SKILL.md` avec frontmatter YAML (champs `name`, `description`, `license`,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Baseline de l'état runtime sur disque — CDC §A.1.4.
@@ -19,7 +19,7 @@ de l'état runtime de la machine, n'est PAS reproductible en CI. La GATE A8
 capture la baseline, la GATE B8 (libellé à proposer en fin de Phase A)
 compare contre elle, en exerçant réellement les artefacts (charger les 8
 skills, relire un fait, résoudre un token) — pas juste en comparant des
-comptes (cf. feedback de Barth § "attraper, pas passer").
+comptes (cf. feedback de Max § "attraper, pas passer").
 """
 
 from __future__ import annotations

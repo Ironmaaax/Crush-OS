@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Pipeline d'ingestion : event → facts via LLM + réconciliation (CDC §6.4–§6.6).
@@ -91,7 +91,7 @@ _EXTRACT_SYSTEM = (
 )
 
 
-def _build_prompt(content: str, source: str, name: str = "Barth") -> str:
+def _build_prompt(content: str, source: str, name: str = "Max") -> str:
     pred_list = ", ".join(sorted(PREDICATES))
     cat_list = ", ".join(sorted(CATEGORIES))
     return (
@@ -232,7 +232,7 @@ class MemoryIngest:
         kernel: MemoryKernel,
         llm: LLMProvider,
         bus: EventBus | None = None,
-        user_firstname: str = "Barth",
+        user_firstname: str = "Max",
         assistant_name: str = "Crush",
     ) -> None:
         self._kernel = kernel

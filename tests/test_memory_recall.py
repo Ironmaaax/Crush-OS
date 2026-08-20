@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests du rappel cross-session et du modèle utilisateur."""
@@ -28,7 +28,7 @@ class TestFTSIndex:
 
     @pytest.mark.asyncio
     async def test_add_and_search(self, fts: FTSIndex) -> None:
-        await fts.add("session1.jsonl", "Barth veut un café le matin")
+        await fts.add("session1.jsonl", "Max veut un café le matin")
         results = await fts.search("café")
         assert len(results) == 1
         assert results[0]["doc_id"] == "session1.jsonl"
@@ -151,12 +151,12 @@ class TestCrossSessionRecall:
         mock_vector.search = AsyncMock(return_value=[])
 
         mock_llm = MagicMock()
-        mock_llm.complete = AsyncMock(return_value="Barth veut du café le matin.")
+        mock_llm.complete = AsyncMock(return_value="Max veut du café le matin.")
 
         recall = CrossSessionRecall(llm=mock_llm, fts_index=fts, vector_index=mock_vector)
         result = await recall.recall("café")
 
-        assert result == "Barth veut du café le matin."
+        assert result == "Max veut du café le matin."
         mock_llm.complete.assert_awaited_once()
 
     @pytest.mark.asyncio

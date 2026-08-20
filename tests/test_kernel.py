@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests du Memory Kernel (CDC §6.1–§6.2) — schéma, CRUD, FTS5, atomicité, correction humaine."""
@@ -20,7 +20,7 @@ from crush.providers.memory.schemas import (
 
 
 def _make_fact(
-    subject: str = "barth",
+    subject: str = "Max",
     predicate: str = "prefers",
     obj: str = "python",
     category: str = "tool",
@@ -68,7 +68,7 @@ def test_kernel_idempotent_init(tmp_path: Path) -> None:
 
 
 def test_normalize() -> None:
-    assert normalize("  BARTH  ") == "barth"
+    assert normalize("  MAX  ") == "max"
     assert normalize("Python") == "python"
 
 
@@ -77,7 +77,7 @@ def test_normalize() -> None:
 
 def test_event_log_immuable(tmp_path: Path) -> None:
     k = MemoryKernel(tmp_path / "m.db")
-    evt = k.log_event("exchange", "voice", "Barth dit qu'il vise sub-3h")
+    evt = k.log_event("exchange", "voice", "Max dit qu'il vise sub-3h")
     assert evt.id.startswith("evt_")
     assert evt.type == "exchange"
     assert evt.metadata_json is None
@@ -108,7 +108,7 @@ def test_insert_et_get_fact(tmp_path: Path) -> None:
 
     fetched = k.get_fact("fact_test")
     assert fetched is not None
-    assert fetched.subject == "barth"
+    assert fetched.subject == "Max"
     assert fetched.confidence == 0.75
     assert fetched.importance == 0.6
 
@@ -116,19 +116,19 @@ def test_insert_et_get_fact(tmp_path: Path) -> None:
 def test_find_active_match_meme_triplet(tmp_path: Path) -> None:
     """find_active_match retrouve un fact ACTIF sur (subject, predicate, category)."""
     k = MemoryKernel(tmp_path / "m.db")
-    fact = _make_fact(subject="Barth", predicate="prefers", obj="python", category="tool")
+    fact = _make_fact(subject="Max", predicate="prefers", obj="python", category="tool")
     fact.id = "fact_1"
     fact.subject = normalize(fact.subject)
     fact.predicate = normalize(fact.predicate)
     fact.category = normalize(fact.category)
     k.insert_fact(fact)
 
-    match = k.find_active_match("Barth", "prefers", "tool")
+    match = k.find_active_match("Max", "prefers", "tool")
     assert match is not None
     assert match.id == "fact_1"
 
     # Différent predicate → pas de match
-    assert k.find_active_match("Barth", "dislikes", "tool") is None
+    assert k.find_active_match("Max", "dislikes", "tool") is None
     # Différent subject → pas de match
     assert k.find_active_match("Alice", "prefers", "tool") is None
 
@@ -138,7 +138,7 @@ def test_find_active_ignore_superseded(tmp_path: Path) -> None:
     fact = _make_fact(status=FactStatus.SUPERSEDED)
     fact.id = "fact_s"
     k.insert_fact(fact)
-    assert k.find_active_match("barth", "prefers", "tool") is None
+    assert k.find_active_match("Max", "prefers", "tool") is None
 
 
 def test_update_fact_change_status_et_reindex_fts(tmp_path: Path) -> None:
@@ -233,7 +233,7 @@ def test_link_facts_supersedes(tmp_path: Path) -> None:
 
 def test_fts_recherche_basique(tmp_path: Path) -> None:
     k = MemoryKernel(tmp_path / "m.db")
-    f = _make_fact(subject="barth", predicate="targets", obj="sub-3h marathon", category="goal")
+    f = _make_fact(subject="Max", predicate="targets", obj="sub-3h marathon", category="goal")
     f.id = "fact_goal"
     k.insert_fact(f)
 
@@ -291,7 +291,7 @@ def test_apply_correction_met_a_jour_fact_et_trace_event(tmp_path: Path) -> None
     evt, updated = k.apply_correction(
         target_fact_id="goal_marathon",
         new_object="3h10",
-        correction_text="Barth dit qu'il révise son objectif à 3h10",
+        correction_text="Max dit qu'il révise son objectif à 3h10",
     )
 
     assert evt.type == "human_correction"
@@ -326,4 +326,4 @@ def test_persistence_apres_reouverture(tmp_path: Path) -> None:
     k2 = MemoryKernel(db)
     fetched = k2.get_fact("persist")
     assert fetched is not None
-    assert fetched.subject == "barth"
+    assert fetched.subject == "Max"

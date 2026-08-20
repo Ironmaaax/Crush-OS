@@ -5,7 +5,7 @@
 **Changelog 1.3 :** revue croisée round 3 (couche non-Python) — étiquetage [CI]/[LOCAL] de tous les gates + deux lanes CI (§0.5, F.1.2), audit des chemins étendu à la couche shell (`setup.sh`, `install.sh`, `Makefile`, `crush`) avec GATE B9 « install à froid », CLI découplé des shims racine via entry points module (incl. patterns `pkill` l.55), alias skills documenté comme ABI public avec exclusion nommée du GATE C9, PRAGMA `busy_timeout` joint au mode WAL.
 **Changelog 1.2 :** revue croisée round 2 — process voix traité comme second composition root (C.1.8, GATE C10), imports dynamiques couverts par l'audit et les gates (`__import__` + `import_module`), alias de compatibilité pour les skills installés (découverte : les 8 skills installés importent `skills.base` — namespace racine), continuité des données sur disque (baseline A, GATE B8, migration de `vision/faces/`), marqueurs `integration` avancés en Phase A pour un gate par-commit rapide en B/C.
 **Changelog 1.1 :** intégration des 6 amendements de la revue croisée Opus 4.8 — précondition de séquencement produit (§0.4), snapshot mécanique des routes (A/B/C/E), gate chemins B7, smoke runtime C8, gate ré-exports C9, type-check de conformité des Protocols (F).
-**Auteur :** Barthélemy Houot
+**Auteur :** Max Ea
 **Exécutant :** Claude Code, en mode stop-and-validate strict
 **Référence amont :** `CDC_crush_evolution.md`
 
@@ -16,7 +16,7 @@
 Ce document est découpé en **6 phases (A → F)**. Les règles suivantes sont **non négociables** :
 
 1. **Une phase = un périmètre fermé.** Tu n'anticipes JAMAIS sur la phase suivante, même si une modification semble « évidente ». Si tu identifies un problème hors périmètre, tu le notes dans `docs/migration/BACKLOG.md` et tu continues.
-2. **STOP obligatoire en fin de phase.** Tu termines chaque phase par : (a) l'exécution complète de la section « Auto-vérifications », (b) un rapport de fin de phase (format en §0.3), (c) un arrêt total en attente de validation humaine. Tu ne commences PAS la phase suivante sans un « GO PHASE X » explicite de Barth.
+2. **STOP obligatoire en fin de phase.** Tu termines chaque phase par : (a) l'exécution complète de la section « Auto-vérifications », (b) un rapport de fin de phase (format en §0.3), (c) un arrêt total en attente de validation humaine. Tu ne commences PAS la phase suivante sans un « GO PHASE X » explicite de Max.
 3. **Commits granulaires, messages en français.** Format : `[PHASE X] <verbe à l'infinitif> <objet>` (ex : `[PHASE A] Créer kernel/contracts.py avec les Protocols LLM et Memory`). Un commit = une unité logique. Jamais de commit fourre-tout.
 4. **Tests verts en permanence.** Après CHAQUE commit : `uv run pytest -m "not integration" -q` (suite rapide, < 30 s — marqueurs posés dès la Phase A). La suite COMPLÈTE (`uv run pytest`) est exigée aux gates de fin de phase. Si un commit casse les tests, tu corriges avant de continuer — pas de « je réparerai plus tard ».
 5. **Aucune réécriture opportuniste.** Tu déplaces et tu recâbles, tu ne réécris pas la logique métier. Si du code te semble améliorable, → `BACKLOG.md`.
@@ -396,8 +396,8 @@ uv run python scripts/migration/check_paths_runtime.py && echo "GATE B7b ✅"
 - **Q2 :** `skills/installed/` contient des skills installés par l'utilisateur — doivent-ils vivre DANS le package ou dans un répertoire de données utilisateur hors package (comme `memory_data/`) ? Recommandation : hors package (`skills_data/installed/`), chargés dynamiquement. Si retenu : **migrer les 8 skills réels existants** (déplacement des fichiers, pas seulement du loader), et le GATE B8 vérifie leur chargement post-migration. L'alias de namespace (B.2bis) est requis dans les deux cas.
 
 ### B.5 Critères de validation humaine (STOP)
-- Barth lance lui-même `crush run`, ouvre `/admin`, fait un échange de chat, vérifie un outil (météo) et la mémoire.
-- Barth lance `crush voice` si LiveKit est dispo.
+- Max lance lui-même `crush run`, ouvre `/admin`, fait un échange de chat, vérifie un outil (météo) et la mémoire.
+- Max lance `crush voice` si LiveKit est dispo.
 - Rapport de phase + tag `migration-phase-B`.
 
 ---
@@ -711,14 +711,14 @@ find src -name "*.py" | xargs wc -l | tail -1
 Pour éviter toute dérive de scope, ce CDC NE couvre PAS :
 - La réécriture du front (ES modules pour `capabilities.js` / `macropad_2k.js`) → CDC ultérieur.
 - Tout changement fonctionnel, optimisation de prompt, ou évolution du Mission Engine.
-- La question de la licence et du positionnement open source.
+- La question de la   et du positionnement open source.
 - Le typage strict généralisé du codebase (mypy strict sur 46k lignes) — seul le périmètre kernel + conformité des Protocols est couvert (F.3bis).
 - Le retrait des shims racine `main.py`/`voice_agent.py` (conservés une version pour les appelants externes ; le CLI en est découplé dès B) → BACKLOG.
 - Le retrait de l'alias ABI skills — contrat permanent documenté, pas un résidu de migration (B.2bis).
 - Git LFS / réécriture d'historique pour les gros binaires (les compressions de F.1.5 ne nettoient que le futur).
 - Le déplacement éventuel de `skills/installed/` hors package SI la décision B.4-Q2 le reporte.
 
-## 10. Récapitulatif des décisions à prendre par Barth
+## 10. Récapitulatif des décisions à prendre par Max
 
 | ID | Question | Phase | Recommandation |
 |---|---|---|---|

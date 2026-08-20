@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -165,11 +165,11 @@ async def test_read_file_success(tmp_path: Path) -> None:
 
     tool = ReadFileTool(allowed_roots=[tmp_path])
     f = tmp_path / "hello.txt"
-    f.write_text("Bonjour Barth")
+    f.write_text("Bonjour Max")
 
     result = await tool.execute(path=str(f))
     assert not result.is_error
-    assert result.content == "Bonjour Barth"
+    assert result.content == "Bonjour Max"
 
 
 async def test_read_file_access_denied(tmp_path: Path) -> None:
@@ -287,6 +287,6 @@ async def test_cli_runner_with_args(tmp_path: Path) -> None:
     yaml_path.write_text('greet:\n  command: ["echo"]\n  description: "Greet"\n')
     tool = CLIRunnerTool(whitelist_path=yaml_path)
 
-    result = await tool.execute(alias="greet", args=["Barth"])
+    result = await tool.execute(alias="greet", args=["Max"])
     assert not result.is_error
-    assert "Barth" in result.content
+    assert "Max" in result.content

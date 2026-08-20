@@ -1,5 +1,5 @@
-# Copyright (C) 2026 Barthélemy Houot
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# Copyright (C) 2026 Max Ea
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Mission réelle d'ingestion PHASE 3 — test du Kernel + réconciliation sur vrai LLM.
@@ -11,7 +11,7 @@ plusieurs jours simulés et vérifie :
 - Les doublons s'accumulent-ils sur des répétitions ? (NON attendu — confirmation)
 - La supersession se déclenche-t-elle au bon moment ? (sur catégorie stable)
 - Un fait répété monte-t-il en confidence ? (OUI attendu)
-- "Barth court" + "Barth fait du vélo" coexistent-ils ? (OUI attendu, non stable)
+- "Max court" + "Max fait du vélo" coexistent-ils ? (OUI attendu, non stable)
 - Un terme hors vocabulaire → needs_review ? (OUI attendu)
 
 Lancer : uv run python scripts/phase3_real_ingestion.py
@@ -42,37 +42,37 @@ SCENARIO: list[tuple[int, str]] = [
     # Jour 1 — Premiers faits explicites
     (
         1,
-        "Barth : Je suis développeur, et je préfère travailler en Python. "
+        "Max : Je suis développeur, et je préfère travailler en Python. "
         "Mon style de vie inclut beaucoup de course à pied — je vise sub-3h au marathon.",
     ),
     # Jour 2 — Nouveau fait compatible (vélo en plus de la course)
     (
         2,
-        "Barth : Cette semaine j'ai aussi commencé le vélo le dimanche, "
+        "Max : Cette semaine j'ai aussi commencé le vélo le dimanche, "
         "en complément de mes sorties running. C'est une nouvelle habitude.",
     ),
     # Jour 3 — Répétition (même préférence Python) → doit confirmer pas dupliquer
-    (3, "Barth : Encore Python aujourd'hui, je trouve ça vraiment efficace."),
+    (3, "Max : Encore Python aujourd'hui, je trouve ça vraiment efficace."),
     # Jour 5 — Préférence d'outil différente mais coexistante (sur tool, non stable)
-    (5, "Barth : J'ai testé Go cette semaine, je l'utilise sur un side project."),
+    (5, "Max : J'ai testé Go cette semaine, je l'utilise sur un side project."),
     # Jour 7 — Inférence faible (préférence implicite)
-    (7, "Barth : Tu peux me résumer en quelques bullets ? Je préfère la concision."),
+    (7, "Max : Tu peux me résumer en quelques bullets ? Je préfère la concision."),
     # Jour 8 — Confirmation explicite de l'objectif marathon
-    (8, "Barth : Pour info mon objectif marathon reste sub-3h pour cette année."),
+    (8, "Max : Pour info mon objectif marathon reste sub-3h pour cette année."),
     # Jour 10 — CONTRADICTION sur catégorie stable (goal) → supersession attendue
     (
         10,
-        "Barth : Je révise mon objectif marathon. Je vise maintenant 3h10, "
+        "Max : Je révise mon objectif marathon. Je vise maintenant 3h10, "
         "sub-3h c'était trop ambitieux.",
     ),
     # Jour 11 — Identity stable (devrait créer fact identity persistant)
-    (11, "Barth : Je suis aussi entrepreneur, je monte une boîte de hardware."),
+    (11, "Max : Je suis aussi entrepreneur, je monte une boîte de hardware."),
     # Jour 12 — Répétition du nouveau goal → confirmation
-    (12, "Barth : Mon objectif 3h10 au marathon tient toujours."),
+    (12, "Max : Mon objectif 3h10 au marathon tient toujours."),
     # Jour 13 — Hors périmètre (météo, éphémère) → l'ingest doit IGNORER
-    (13, "Barth : Il pleut aujourd'hui, c'est moche."),
+    (13, "Max : Il pleut aujourd'hui, c'est moche."),
     # Jour 14 — Constraint (catégorie stable) — première occurrence
-    (14, "Barth : Je ne peux pas courir le lundi à cause de mes entraînements en salle."),
+    (14, "Max : Je ne peux pas courir le lundi à cause de mes entraînements en salle."),
 ]
 
 

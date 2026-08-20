@@ -24,7 +24,7 @@ RemoteBackend, ScriptRPCRunner) s'inspirent de l'architecture du projet
 - Pas de ControlPersist multi-hôte ni de gestion de clés SSH temporaires.
 - La sous-classe RemoteBackend remplace les providers Modal/Daytona complets.
 
-## Licence source
+##   source
 
 ```
 MIT License

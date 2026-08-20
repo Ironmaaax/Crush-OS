@@ -1,10 +1,10 @@
 # Copyright (C) 2026 Maxime Song
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Rendu des gabarits de prompt — `kernel/prompts.py`.
 
-Remplace la personnalisation par `str.replace("Barth", …)`, qui frappait
+Remplace la personnalisation par `str.replace("Max", …)`, qui frappait
 n'importe quelle sous-chaîne et ne couvrait qu'un fichier.
 """
 
@@ -50,8 +50,8 @@ def test_valeur_contenant_un_placeholder_non_reinterpretee() -> None:
 
 
 def test_pas_de_substitution_partielle_dans_un_mot() -> None:
-    """C'était le défaut de `str.replace` : « Barthélemy » devenait « Maxélemy »."""
-    assert render("Barthélemy et {{user}}", user="Max") == "Barthélemy et Max"
+    """C'était le défaut de `str.replace` : « Max » devenait « Maxélemy »."""
+    assert render("Max et {{user}}", user="Max") == "Max et Max"
 
 
 def test_placeholders_listes() -> None:
@@ -64,7 +64,7 @@ def test_placeholders_listes() -> None:
 def test_prompt_systeme_ne_contient_plus_de_nom_en_dur() -> None:
     """Garde-fou : aucun nom propre ne doit revenir dans le gabarit."""
     texte = (PROMPTS_DIR / "system_static.md").read_text(encoding="utf-8")
-    assert not re.search(r"\bBarth\b", texte), "« Barth » est revenu en dur"
+    assert not re.search(r"\bBarth\b", texte), "« Max » est revenu en dur"
     assert not re.search(r"\bCrush\b", texte), "« Crush » est revenu en dur"
 
 

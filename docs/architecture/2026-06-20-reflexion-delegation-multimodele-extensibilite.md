@@ -35,9 +35,9 @@ une cartographie de l'extensibilité + un **diagnostic empirique neuf** sur les 
   en est le miroir.
 - **3 types** : `conversational` (`SkillBase` = `SYSTEM_PROMPT` injecté + `get_tools()`), `preset`
   (séquence `skill.yaml` déclenchée par triggers → `execute_preset`), `view` (UI JS/CSS).
-- **2 sources d'install** : `Crush-skills` (officiel) **et** **ClawHub** (`clawhub.ai`,
-  [_clawhub.py](../../src/crush/capabilities/skills/_clawhub.py)). Un skill = code Python arbitraire →
-  `vet-skill` recommandé avant install d'un skill tiers.
+- **1 source d'install** : `Crush-skills` uniquement. La source tierce ClawHub a été
+  retirée — un skill = code Python arbitraire, et rien ne doit s'installer depuis un
+  hôte que l'on ne contrôle pas. `vet-skill` reste recommandé avant tout install.
 - Gouvernance du repo (CONTRIBUTING.md / AGENTS.md) : validation **statique** uniquement
   (`validate_catalog.py`, `build_index.py`, 1 extension/PR, secrets via `requires_env`).
   Le **comportement runtime relève de crush-OS** (sandbox Docker).

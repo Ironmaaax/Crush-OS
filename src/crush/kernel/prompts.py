@@ -6,7 +6,7 @@ POURQUOI CE MODULE
 Les prompts étaient rédigés avec des noms propres en dur, puis personnalisés
 par substitution de chaîne au moment de les charger :
 
-    static_system = static_system.replace("Barth", firstname)
+    static_system = static_system.replace("Max", firstname)
     static_system = static_system.replace("Crush", assistant_name)
 
 Trois défauts. La substitution n'est pas ancrée : elle frappe n'importe quelle

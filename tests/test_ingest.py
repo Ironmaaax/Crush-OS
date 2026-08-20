@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests d'ingestion — le cœur dur de la PHASE 3 (CDC §6.4–§6.5).
@@ -99,7 +99,7 @@ def _first_fact_id_in(prompt: str) -> str | None:
 
 
 def _f(
-    subject: str = "Barth",
+    subject: str = "Max",
     predicate: str = "prefers",
     obj: str = "python",
     category: str = "tool",
@@ -134,12 +134,12 @@ async def test_reobservation_confirme_sans_dupliquer(kernel: MemoryKernel) -> No
     )
     ingest = MemoryIngest(kernel, llm)
 
-    r1 = await ingest.ingest("Barth dit qu'il préfère Python", source="test")
+    r1 = await ingest.ingest("Max dit qu'il préfère Python", source="test")
     assert len(r1.new_facts) == 1
     assert len(r1.confirmed) == 0
     initial_conf = r1.new_facts[0].confidence
 
-    r2 = await ingest.ingest("Barth réitère qu'il préfère Python", source="test")
+    r2 = await ingest.ingest("Max réitère qu'il préfère Python", source="test")
     assert len(r2.new_facts) == 0
     assert len(r2.confirmed) == 1
     # On a UN seul fact en base, pas deux
@@ -185,11 +185,11 @@ async def test_contradiction_sur_goal_declenche_supersession(
     )
     ingest = MemoryIngest(kernel, llm)
 
-    r1 = await ingest.ingest("Barth vise sub-3h", source="test")
+    r1 = await ingest.ingest("Max vise sub-3h", source="test")
     old = r1.new_facts[0]
     assert old.status == FactStatus.ACTIVE
 
-    r2 = await ingest.ingest("Barth a revu son objectif à 3h10", source="test")
+    r2 = await ingest.ingest("Max a revu son objectif à 3h10", source="test")
     assert len(r2.superseded_pairs) == 1
     old_after, new = r2.superseded_pairs[0]
     assert old_after.id == old.id
@@ -224,8 +224,8 @@ async def test_contradiction_sur_identity_declenche_supersession(
         ]
     )
     ingest = MemoryIngest(kernel, llm)
-    await ingest.ingest("Barth est dev", source="test")
-    r2 = await ingest.ingest("Barth se décrit comme entrepreneur", source="test")
+    await ingest.ingest("Max est dev", source="test")
+    r2 = await ingest.ingest("Max se décrit comme entrepreneur", source="test")
     assert len(r2.superseded_pairs) == 1
 
 
@@ -235,9 +235,9 @@ async def test_contradiction_sur_identity_declenche_supersession(
 async def test_deux_preferences_coexistent_sans_supersession(
     kernel: MemoryKernel,
 ) -> None:
-    """'Barth prefers python' et 'Barth prefers go' coexistent (preference non stable).
+    """'Max prefers python' et 'Max prefers go' coexistent (preference non stable).
 
-    NB du CDC §6 (test direct) : 'Barth court' + 'Barth fait du vélo' → coexistence.
+    NB du CDC §6 (test direct) : 'Max court' + 'Max fait du vélo' → coexistence.
     Ici on prend deux préférences sur subject/predicate/category identique mais objects
     différents → coexistence attendue.
     """
@@ -248,8 +248,8 @@ async def test_deux_preferences_coexistent_sans_supersession(
         ]
     )
     ingest = MemoryIngest(kernel, llm)
-    await ingest.ingest("Barth aime Python", source="test")
-    r2 = await ingest.ingest("Barth aussi go", source="test")
+    await ingest.ingest("Max aime Python", source="test")
+    r2 = await ingest.ingest("Max aussi go", source="test")
 
     # Sur 'preference', la contradiction ne déclenche PAS supersession → coexistence
     assert len(r2.superseded_pairs) == 0
@@ -259,7 +259,7 @@ async def test_deux_preferences_coexistent_sans_supersession(
 
 
 async def test_predicates_differents_coexistent(kernel: MemoryKernel) -> None:
-    """'Barth uses python' et 'Barth uses go' (prédicats identiques, objects diff)."""
+    """'Max uses python' et 'Max uses go' (prédicats identiques, objects diff)."""
     llm = _ScriptedLLM(
         [
             [_f(predicate="uses", obj="python", category="tool")],
@@ -401,9 +401,9 @@ async def test_ingest_log_toujours_un_event(kernel: MemoryKernel) -> None:
     """Même quand rien n'est extrait, l'event brut est tracé (immuabilité)."""
     llm = _ScriptedLLM([[]])  # zéro faits
     ingest = MemoryIngest(kernel, llm)
-    r = await ingest.ingest("Barth dit bonjour", source="voice")
+    r = await ingest.ingest("Max dit bonjour", source="voice")
     assert kernel.count_events() == 1
-    assert r.event.content == "Barth dit bonjour"
+    assert r.event.content == "Max dit bonjour"
     assert r.event.source == "voice"
 
 
@@ -516,8 +516,8 @@ async def test_arbiter_new_sur_stable_donne_coexistence(kernel: MemoryKernel) ->
 async def test_arbiter_appele_sur_sibling_fts(kernel: MemoryKernel) -> None:
     """Pas de match exact mais sibling FTS5 trouvé (même cat, object overlap) →
     l'arbitre est appelé pour décider si c'est une paraphrase."""
-    # 1er fact : 'barth has running' (prédicat 'has', catégorie habit)
-    # 2e fact : 'barth has course à pied' (mêmes subj, cat ; FTS hit sur 'course')
+    # 1er fact : 'Max has running' (prédicat 'has', catégorie habit)
+    # 2e fact : 'Max has course à pied' (mêmes subj, cat ; FTS hit sur 'course')
     # Arbitre dit "same_as" → CONFIRM du 1er
     llm = _ScriptedLLM(
         [

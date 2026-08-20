@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 """Tests du miroir Markdown unidirectionnel (CDC §6.7).
@@ -27,7 +27,7 @@ from crush.providers.memory.schemas import DecayPolicy, Fact, FactStatus
 
 def _make_fact(
     fid: str,
-    subject: str = "barth",
+    subject: str = "Max",
     predicate: str = "prefers",
     obj: str = "python",
     category: str = "tool",

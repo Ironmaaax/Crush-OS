@@ -1,7 +1,7 @@
 # Cahier des charges — Évolution de crush-OS
 
 **Destinataire : agent de code (Claude Code).**
-**Auteur : Barthélemy Houot.**
+**Auteur : Max Ea.**
 **Objet : transformer crush-OS d'un assistant à mémoire plate en un système à couches — mémoire vivante, exécution de missions vérifiées, auto-apprentissage et prise d'initiative gouvernée.**
 
 ---
@@ -190,7 +190,7 @@ Remplacer les `topics/` plats par une mémoire structurée, datée, sourcée, re
 - `fact_observations` : renforcement sans duplication. Champs : `id`, `fact_id`, `event_id`, `observation_type` (`confirm`|`weaken`|`correct`), `confidence_delta`, `created_at`. **Indispensable pour tracer l'historique des confirmations.**
 - `fact_relations` : `id`, `from_fact_id`, `to_fact_id`, `relation_type` (`supersedes`|`contradicts`|`supports`|`related_to`), `created_at`.
 
-**6.3 — Atomicité.** Une note = une idée. Pas de bloc "Projet X" contenant dix infos. "Barth vise sub-3h" est un fact ; "Barth court depuis un an" en est un autre. Sans atomicité, la datation et le decay sont inopérants.
+**6.3 — Atomicité.** Une note = une idée. Pas de bloc "Projet X" contenant dix infos. "Max vise sub-3h" est un fact ; "Max court depuis un an" en est un autre. Sans atomicité, la datation et le decay sont inopérants.
 
 **6.4 — Pipeline d'ingestion (`memory/ingest.py`).** À chaque échange/observation important :
 1. Logger l'`Event` brut (immuable).
@@ -224,7 +224,7 @@ Remplacer les `topics/` plats par une mémoire structurée, datée, sourcée, re
 ### Tests à écrire
 - Un fact ré-observé n'est pas dupliqué : `support_count` et `confidence` augmentent, une `FactObservation` est créée.
 - "objectif = sub-3h" puis "objectif = 3h10" → l'ancien passe `superseded`, relation `supersedes` créée, ancien conservé.
-- "Barth court" + "Barth fait du vélo" → coexistence, pas de supersession.
+- "Max court" + "Max fait du vélo" → coexistence, pas de supersession.
 - Un prédicat hors vocabulaire → `needs_review`, jamais en base principale.
 - Édition manuelle d'un .md miroir → AUCUN effet sur la DB ; régénération écrase l'édition.
 - Une `human_correction` via commande → fact mis à jour + event tracé.

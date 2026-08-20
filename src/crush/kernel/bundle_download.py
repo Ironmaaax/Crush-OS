@@ -1,6 +1,6 @@
-# Copyright (C) 2026 Barthélemy Houot
+# Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
+# This file is part of CRUSH-OS,   .
 # See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 from __future__ import annotations
@@ -27,8 +27,14 @@ from crush.kernel.bundle import (
 )
 
 BUNDLE_RELEASE_VERSION = "v0.3.2"
-BUNDLE_CDN_ROOT = f"https://techalchemy.fr/crush-bundle-windows-{BUNDLE_RELEASE_VERSION}"
-BUNDLE_ZIP_URL = f"{BUNDLE_CDN_ROOT}/bundle.zip"
+BUNDLE_CDN_ROOT = (
+    f"https://github.com/Ironmaaax/Crush-OS/releases/download/{BUNDLE_RELEASE_VERSION}"
+)
+BUNDLE_ZIP_URL = f"{BUNDLE_CDN_ROOT}/crush-offline-windows-{BUNDLE_RELEASE_VERSION}.zip"
+# ATTENTION : cette taille est celle de l'archive de l'ancien hebergement tiers.
+# Elle ne correspondra PAS a l'asset produit par build-windows-bundle.yml, et la
+# verification ligne ~185 fera echouer le telechargement jusqu'a ce qu'elle soit
+# remplacee par la taille reelle de ta propre release.
 BUNDLE_ZIP_BYTES = 657_929_168
 # Empreinte SHA-256 de bundle.zip. Vide = non verifiee, seule la taille l'est —
 # or une taille identique ne prouve rien sur le contenu, et l'archive contient un
