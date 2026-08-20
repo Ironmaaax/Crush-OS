@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """Mission réelle PHASE 1 — test du verifier couche 3 (sémantique) sur un vrai LLM.
 

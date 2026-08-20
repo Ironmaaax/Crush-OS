@@ -92,6 +92,18 @@ printf "  uv sync (cœur seul, sans extras)…\n"
 uv sync --frozen
 ok "Environnement Python prêt"
 
+# Assets front lourds (MediaPipe + modèles, ~64 Mo). Hors git : sans eux
+# l'interface irait les chercher chez un tiers à chaque chargement de page, ce
+# qu'on a justement supprimé. Non bloquant : seules la reconnaissance faciale,
+# la séquence de réveil et la détection de gestes en dépendent.
+printf "  Assets front (MediaPipe, ~64 Mo)…\n"
+if uv run python scripts/vendor_assets.py; then
+  ok "Assets front vérifiés"
+else
+  warn "Assets front non récupérés — reconnaissance faciale et gestes indisponibles.
+       Relance plus tard : uv run python scripts/vendor_assets.py"
+fi
+
 # ── 4. Configuration ──────────────────────────────────────────────────────────
 step "Configuration"
 

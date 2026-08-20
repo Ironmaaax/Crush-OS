@@ -94,9 +94,9 @@
     const FACE_FRAME_RADIUS  = 14;    // px
     const FACE_LASER_LEN     = 110;   // px
     const FACE_LASER_THICK   = 1.5;
-    const FACE_WASM_BASE     = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.6/wasm';
-    const FACE_MODEL_URL     = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-    const FACE_VISION_BUNDLE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.6/vision_bundle.mjs';
+    const FACE_WASM_BASE     = '/vendor/mediapipe/tasks-vision-0.10.6/wasm';
+    const FACE_MODEL_URL     = '/vendor/mediapipe/models/face_landmarker.task';
+    const FACE_VISION_BUNDLE = '/vendor/mediapipe/tasks-vision-0.10.6/vision_bundle.mjs';
 
     function runFacePhase(rootEl, opts, onDone) {
         const userName    = opts.userName    || '';

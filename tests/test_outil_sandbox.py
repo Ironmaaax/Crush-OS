@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """Garde-fous du sandbox : `execute_script` et `spawn_subagent` rendent TOUJOURS la main.
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """Stub Signal pour Crush — à implémenter via signal-cli ou AsamiSignal."""
 

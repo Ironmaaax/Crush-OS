@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """
 Outil Fusion 360 pour Crush — Autodesk MCP HTTP (port 27182 par défaut).

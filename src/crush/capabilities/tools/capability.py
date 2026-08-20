@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """Tool LLM pour signaler un manque de capacité (PHASE 5 §8).
 

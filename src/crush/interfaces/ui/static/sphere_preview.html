@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title id="page-title">Crush — Sphere</title>
 <script>document.getElementById('page-title').textContent = (window.CRUSH_ASSISTANT_NAME || 'Crush') + ' — Sphere';</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="/vendor/fonts/fonts.css" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; background: #06080D; overflow: hidden; font-family: 'DM Mono', monospace; }
@@ -60,7 +59,7 @@ canvas { display: block; }
 <div id="hint">clic pour changer d'état</div>
 <div id="state-label">IDLE</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="/vendor/three/three.min.js"></script>
 <script>
 'use strict';
 

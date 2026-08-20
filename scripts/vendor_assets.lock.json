@@ -1,0 +1,26 @@
+{
+  "sha256": {
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh.binarypb": "139546bf05aebb33e2611b6b945f3a1629c316ca924e33cec1547c85ddef9f53",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh.js": "5db8555ac80ca2ad7366fbb3ea53c0d0959609fc9abb7b8be37a74ec1ac4ba9c",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_packed_assets.data": "dbe5905c582c0462cdaea17e7e6ecea92edaa8cccc515c5e2e7291f2cbb5fb99",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_packed_assets_loader.js": "e5de8685b299184813f7cec668e499023937ae521b70f60cd0fc4832930446e0",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_simd_wasm_bin.data": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_simd_wasm_bin.js": "ca291877afb9c13308cf6be42f23cd39f1adf0036bb63ecad2ce16073bcf07c7",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_simd_wasm_bin.wasm": "fb9e9cfe8b83a914e40eab2efd3b0d92a61f82a7c968589f223ab2a7e331d314",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_wasm_bin.js": "0a532ae8450e7e5f2788cc92ad190210f721446d3fd9cb259fdda958e66102c1",
+    "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_wasm_bin.wasm": "54522fa25c505bf094242f969b4e4919125eb0dadccb568f2af171bbd65865f9",
+    "mediapipe/models/blaze_face_short_range.tflite": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
+    "mediapipe/models/face_landmarker.task": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+    "mediapipe/models/gesture_recognizer.task": "97952348cf6a6a4915c2ea1496b4b37ebabc50cbbf80571435643c455f2b0482",
+    "mediapipe/tasks-vision-0.10.14/vision_bundle.mjs": "e77f281f9619150d937023c355bae170e9120e3b9e43f1e23a2a7bee07197669",
+    "mediapipe/tasks-vision-0.10.14/wasm/vision_wasm_internal.js": "9440cf0cc0cea21800e31581ec32aeedcc5fbf9df4509796bbc7d3f99e52ab9c",
+    "mediapipe/tasks-vision-0.10.14/wasm/vision_wasm_internal.wasm": "f82a8e6c05e08a44cc9f9e7ec5f845935bcbb1b1500ebe8c2f4812fb4e2917dc",
+    "mediapipe/tasks-vision-0.10.14/wasm/vision_wasm_nosimd_internal.js": "abe9b6fbeaf86fcb53a5edce3926c82ccb0619e18fed4d9d9ce561ee7f55e054",
+    "mediapipe/tasks-vision-0.10.14/wasm/vision_wasm_nosimd_internal.wasm": "38b61feab2fd7934e05cbe9f68baa308978a5e3b7f85c1913bb8ae89b8ef8b97",
+    "mediapipe/tasks-vision-0.10.6/vision_bundle.mjs": "bc3478cd10a089401dfc78e5ba7aa9053220178806f17709e3a380e1ff4d165a",
+    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_internal.js": "83564c478f223b8f48f118ee1a44cb1e6ae0c6852a2d3f92578f1ee428d583a3",
+    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_internal.wasm": "82ce4e58488ae07160f1cc9c1aeb09795b95401687845e370ddfab9b1d262051",
+    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_nosimd_internal.js": "64cd4d0671a092c578a4e016653b217d8bf6294645f2e58bf1bdaab8a2c66b0c",
+    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_nosimd_internal.wasm": "1774eb27bdca99c316e56a04a060ac5deade518ae57a2259a76d0fa9e526bd1d"
+  }
+}

@@ -184,9 +184,20 @@ Installation classique avec uv sur la machine (téléchargements à chaque `uv s
 uv sync
 # reconnaissance faciale optionnelle :
 uv sync --extra vision
+# assets front lourds (MediaPipe + modèles, ~64 Mo) :
+python scripts/vendor_assets.py
 ```
 
 Puis `./crush eclosion` ou `.\crush.ps1 setup` selon l'OS.
+
+> **Assets front.** L'interface ne charge **aucune ressource depuis un tiers** :
+> polices, `three`, `gsap` et `mermaid` sont versionnés dans le dépôt, et les
+> runtimes WebAssembly de MediaPipe (~64 Mo, trop lourds pour git) sont récupérés
+> par `scripts/vendor_assets.py`. Chaque fichier est épinglé à une version exacte
+> et vérifié par empreinte SHA-256 (`scripts/vendor_assets.lock.json`) au
+> téléchargement **et** à chaque démarrage. Sans ces assets l'assistant tourne
+> normalement ; seules la reconnaissance faciale, la séquence de réveil et la
+> détection de gestes sont indisponibles. `--check` vérifie sans rien télécharger.
 
 > **Serveur distant / headless (VPS, conteneur) :** la détection de double-clap
 > (`CLAP_DETECTION_ENABLED`) et le pipeline vocal local écoutent le micro **de la

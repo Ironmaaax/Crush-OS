@@ -8,7 +8,7 @@
 //  sont envoyés à Crush via le WebSocket existant.
 // ═════════════════════════════════════════════════════════════════════════════
 
-const _MP_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const _MP_BASE = '/vendor/mediapipe/tasks-vision-0.10.14';
 
 let _faceDetector = null;
 let _gestureRec   = null;
@@ -466,11 +466,11 @@ async function mpInit() {
     // Attend que le module script ait exposé MediaPipe sur window
     const lib = await _waitForLib();
     const { FilesetResolver, FaceDetector, GestureRecognizer } = lib;
-    const vision = await FilesetResolver.forVisionTasks(_MP_CDN + '/wasm');
+    const vision = await FilesetResolver.forVisionTasks(_MP_BASE + '/wasm');
     [_faceDetector, _gestureRec] = await Promise.all([
       FaceDetector.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+          modelAssetPath: '/vendor/mediapipe/models/blaze_face_short_range.tflite',
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
@@ -478,7 +478,7 @@ async function mpInit() {
       }),
       GestureRecognizer.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+          modelAssetPath: '/vendor/mediapipe/models/gesture_recognizer.task',
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
@@ -500,7 +500,7 @@ function _waitForLib() {
   if (window._MediaPipeVision) return Promise.resolve(window._MediaPipeVision);
   if (window._mpLibPromise)    return window._mpLibPromise;
 
-  window._mpLibPromise = import(_MP_CDN + '/vision_bundle.mjs').then(mod => {
+  window._mpLibPromise = import(_MP_BASE + '/vision_bundle.mjs').then(mod => {
     window._MediaPipeVision = {
       FilesetResolver:   mod.FilesetResolver,
       FaceDetector:      mod.FaceDetector,

@@ -272,10 +272,10 @@ function _preloadFaceMesh() {
     _faceMeshLoading = true;
     const s = document.createElement('script');
     s.crossOrigin = 'anonymous';
-    s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js';
+    s.src = '/vendor/mediapipe/face_mesh-0.4.1633559619/face_mesh.js';
     s.onload = () => {
         _faceMesh = new window.FaceMesh({
-            locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
+            locateFile: f => `/vendor/mediapipe/face_mesh-0.4.1633559619/${f}`
         });
         _faceMesh.setOptions({
             maxNumFaces: 1,

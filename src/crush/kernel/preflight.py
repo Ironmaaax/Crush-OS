@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
-# See the LICENSE file or <https://www.gnu.org/licenses/agpl-3.0.html>.
+ 
 
 """preflight.py — Diagnostic de démarrage.
 
@@ -18,7 +18,9 @@ détecté (le message d'explication est déjà affiché).
 
 from __future__ import annotations
 
+import hashlib
 import importlib
+import json
 import os
 import socket
 import sys
@@ -275,11 +277,76 @@ FIX :
 # ── Orchestration ─────────────────────────────────────────────────────────────
 
 
+# ── 5. Assets front rapatriés ─────────────────────────────────────────────────
+
+# Runtimes WASM MediaPipe et modèles, ~64 Mo, hors git et récupérés par
+# scripts/vendor_assets.py. Deux situations très différentes :
+#   - absents  -> reconnaissance faciale/gestuelle indisponible, mais l'assistant
+#                 fonctionne : simple avertissement ;
+#   - présents mais empreinte différente -> du code qui sera EXÉCUTÉ dans le
+#                 navigateur ne correspond plus à ce qui a été vérifié : bloquant.
+_VENDOR_DIR = Path(__file__).resolve().parents[1] / "interfaces/ui/static/vendor"
+_VENDOR_LOCK = Path(__file__).resolve().parents[3] / "scripts/vendor_assets.lock.json"
+
+
+def check_vendor_assets() -> bool:
+    if not _VENDOR_LOCK.exists():
+        return True  # dépôt sans le verrou : rien à vérifier, on ne bloque pas
+
+    try:
+        expected = json.loads(_VENDOR_LOCK.read_text(encoding="utf-8")).get("sha256", {})
+    except (OSError, ValueError) as e:
+        _warn("Verrou des assets front illisible", f"{_VENDOR_LOCK.name} : {e}")
+        return True
+
+    missing: list[str] = []
+    altered: list[str] = []
+    for rel, digest in sorted(expected.items()):
+        f = _VENDOR_DIR / rel
+        if not f.is_file():
+            missing.append(rel)
+            continue
+        h = hashlib.sha256()
+        with f.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        if h.hexdigest() != digest:
+            altered.append(rel)
+
+    if altered:
+        lines = ["Des assets servis au navigateur ne correspondent plus à leur empreinte :", ""]
+        lines += [f"  - {rel}" for rel in altered]
+        lines += [
+            "",
+            "POURQUOI C'EST BLOQUANT : ces fichiers sont du WebAssembly et du JS",
+            "EXÉCUTÉS dans ton navigateur. Une empreinte différente veut dire un",
+            "contenu différent de celui vérifié à la release — corruption ou",
+            "substitution. On ne les sert pas.",
+            "",
+            "FIX :",
+            "    supprime src/crush/interfaces/ui/static/vendor/mediapipe/",
+            "    puis  python scripts/vendor_assets.py",
+        ]
+        _err("Assets front altérés", "\n".join(lines))
+        return False
+
+    if missing:
+        _warn(
+            "Assets front absents",
+            f"{len(missing)} fichier(s) MediaPipe manquant(s) sur {len(expected)}.\n"
+            "La reconnaissance faciale, la séquence de réveil et la détection de\n"
+            "gestes seront indisponibles ; le reste de l'assistant fonctionne.\n\n"
+            "FIX :  python scripts/vendor_assets.py",
+        )
+
+    return True
+
+
 def main() -> int:
     print(_c("2", "Vérification de l'environnement Crush…"), file=sys.stderr)
 
     fatal = False
-    for chk in (check_python, check_deps, check_env, check_port):
+    for chk in (check_python, check_deps, check_env, check_port, check_vendor_assets):
         try:
             if not chk():
                 fatal = True

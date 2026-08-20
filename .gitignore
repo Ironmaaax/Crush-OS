@@ -76,3 +76,9 @@ config/approvals.json
 # Archives produites par scripts/sauvegarde_memoire.py — la memoire de
 # lassistant, propre a chaque machine et parfois volumineuse.
 sauvegardes/
+
+# Assets front lourds rapatries par scripts/vendor_assets.py : runtimes WASM de
+# MediaPipe et modeles, ~64 Mo. Committes, ils alourdiraient chaque clone pour
+# toujours. Ils sont epingles a une version exacte et verifies par SHA-256 via
+# scripts/vendor_assets.lock.json, lui bien suivi par git.
+src/crush/interfaces/ui/static/vendor/mediapipe/

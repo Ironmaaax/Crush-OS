@@ -36,6 +36,23 @@ Actions sur **push d'un tag `vX.Y.Z`**. Plus de build manuel ni d'upload à la m
   → produit `bundle/`. Le workflow ne remplace pas le script, il l'automatise et
   ajoute le zip + la release.
 
+## Assets front : quand regénérer le verrou
+
+`scripts/vendor_assets.py` épingle les runtimes MediaPipe et les modèles à une
+version exacte, vérifiée par SHA-256. Si tu changes une des constantes de version
+en tête du script (`TASKS_VISION_NEW`, `TASKS_VISION_OLD`, `FACE_MESH`) :
+
+```bash
+python scripts/vendor_assets.py --update-lock   # re-télécharge et regénère les empreintes
+git add scripts/vendor_assets.lock.json
+```
+
+Le verrou **doit** être committé : c'est lui qui rend les assets vérifiables. Sans
+lui, le préflight ne peut plus distinguer un fichier légitime d'un fichier
+substitué, et le script refuse de tourner. Ne regénère jamais le verrou sans
+regarder ce qui a changé — c'est le seul moment où tu accordes ta confiance à du
+code tiers qui sera exécuté dans le navigateur.
+
 ## Tester le workflow sans polluer les vraies releases
 
 Pousse un tag jetable, puis supprime la release + le tag après vérification :
