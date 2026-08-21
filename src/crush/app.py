@@ -47,6 +47,7 @@ from crush.interfaces.api.deezer import router as deezer_router
 from crush.interfaces.api.ecosysteme import router as ecosysteme_router
 from crush.interfaces.api.globe import router as globe_router
 from crush.interfaces.api.google_oauth import router as google_oauth_router
+from crush.interfaces.api.graphe import router as graphe_router
 from crush.interfaces.api.http import _log_sink
 from crush.interfaces.api.http import router as http_router
 from crush.interfaces.api.local_music import router as local_music_router
@@ -301,6 +302,7 @@ app.include_router(admin_ui_router)
 app.include_router(admin_router)
 app.include_router(projects_router)
 app.include_router(ecosysteme_router)
+app.include_router(graphe_router)
 app.include_router(widgets_router)
 app.include_router(spotify_router)
 app.include_router(deezer_router)

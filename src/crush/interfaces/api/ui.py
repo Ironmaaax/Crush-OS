@@ -115,6 +115,25 @@ async def home_ui() -> Response:
     )
 
 
+@router.get("/graphe", include_in_schema=False)
+async def graphe_ui() -> Response:
+    """La vue Cerveau — le graphe de ce dont l'assistant est fait.
+
+    Sert `three.min.js` : la simulation et le rendu en dépendent, et c'est la
+    copie locale, pas un CDN.
+    """
+    return _ui_html_response(
+        Path("src/crush/interfaces/ui/static/graphe.html"),
+        [
+            ("/_shared.css", "src/crush/interfaces/ui/static/_shared.css"),
+            ("/graphe.css", "src/crush/interfaces/ui/static/graphe.css"),
+            ("/three.min.js", "src/crush/interfaces/ui/static/three.min.js"),
+            ("/_shared.js", "src/crush/interfaces/ui/static/_shared.js"),
+            ("/graphe.js", "src/crush/interfaces/ui/static/graphe.js"),
+        ],
+    )
+
+
 @router.get("/capabilities", include_in_schema=False)
 async def capabilities_ui() -> Response:
     return _ui_html_response(

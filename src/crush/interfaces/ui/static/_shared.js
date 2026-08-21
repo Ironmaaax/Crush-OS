@@ -240,6 +240,7 @@
     workspace:  { chapter: "I",  num: "01", label: "PILOTAGE",      watermark: "Pilotage" },
     capacites:  { chapter: "II", num: "02", label: "ATELIER",       watermark: "Atelier" },
     config:     { chapter: "III",num: "03", label: "RÉGLAGES",      watermark: "Réglages" },
+    cerveau:    { chapter: "IV", num: "04", label: "CERVEAU",      watermark: "Cerveau" },
   };
 
   Crush.setMode = function (mode) {
@@ -388,8 +389,9 @@
   const ROOMS = [
     { mode: "home",      label: "Home",          sub: "Ambient · À l'écoute",                  href: "/",             chapter: "—",   pages: [] },
     { mode: "workspace", label: "Workspace",      sub: "Ce que tu pilotes en ce moment",         href: "/dashboard",    chapter: "I",   pages: ["Aperçu","Initiatives","Missions","Tâches","Analytics"] },
-    { mode: "capacites", label: "Capacités",      sub: "Ce que " + (window.CRUSH_ASSISTANT_NAME || "Crush") + " sait faire pour toi",      href: "/capabilities", chapter: "II",  pages: ["Intégrations","Skills","Routines","Ambiances","Store","Écosystème"] },
+    { mode: "capacites", label: "Capacités",      sub: "Ce que " + (window.CRUSH_ASSISTANT_NAME || "Crush") + " sait faire pour toi",      href: "/capabilities", chapter: "II",  pages: ["Intégrations","Skills","Routines","Vues","Store","Écosystème","Appareils","Fils","Mémoire","Coffre"] },
     { mode: "config",    label: "Configuration",  sub: "Tes préférences et ton coffre",           href: "/settings",     chapter: "III", pages: ["Préférences","Modèles & API","Audio & voix","Conso","Système","À propos"] },
+    { mode: "cerveau",   label: "Cerveau",        sub: "Tout ce qu'il sait, et ce qui est relié",  href: "/graphe",       chapter: "IV",  pages: ["Graphe"] },
   ];
 
   function ensureMissionControl() {

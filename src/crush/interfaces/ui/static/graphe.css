@@ -1,0 +1,277 @@
+/* graphe.css — la vue Cerveau.
+ *
+ * Le graphe occupe tout l'écran ; les panneaux flottent par-dessus. Ils sont
+ * translucides et fins parce qu'ils masquent forcément une partie de ce qu'on
+ * essaie de regarder : sur un téléphone ils se replient en bas, en pastilles.
+ */
+
+#graphe-scene {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, #0a0d12 0%, #05070a 70%, #030405 100%);
+}
+
+#graphe-scene canvas { display: block; }
+
+/* Les libellés sont du DOM, pas des sprites : à cette taille de texte, une
+ * texture rendue dans la scène est floue, et un sprite par nœud coûte plus cher
+ * qu'un div qu'on repositionne. Ils ne captent jamais la souris — le clic doit
+ * atteindre la sphère qui est dessous. */
+#graphe-labels {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.g-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: Geist, system-ui, sans-serif;
+  font-size: 11.5px;
+  letter-spacing: .01em;
+  color: rgba(235, 238, 245, .82);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .95), 0 0 2px rgba(0, 0, 0, 1);
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.g-label[data-fort="true"] {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* ── Panneaux ─────────────────────────────────────────────────────────────── */
+
+.g-panneau {
+  position: fixed;
+  background: rgba(8, 11, 16, .82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 12px;
+  padding: 16px;
+  font-family: Geist, system-ui, sans-serif;
+  color: #d6dae2;
+  font-size: 13px;
+}
+
+#g-gauche {
+  top: 84px;
+  left: 24px;
+  width: 268px;
+  max-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+#g-droite {
+  top: 84px;
+  right: 24px;
+  width: 208px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+#g-outils {
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 7px;
+  align-items: center;
+}
+
+.g-titre {
+  font-family: "Space Grotesk", Geist, sans-serif;
+  font-size: 16px;
+  color: #f0f2f6;
+  margin: 0;
+}
+
+.g-sous {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  margin-top: 2px;
+}
+
+.g-etiquette {
+  font-size: 10px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: #5c6470;
+  margin: 0 0 7px;
+}
+
+#g-recherche {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 7px;
+  color: #e6e9ef;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+#g-recherche:focus {
+  outline: none;
+  border-color: rgba(212, 175, 106, .5);
+}
+
+/* ── Fiche du nœud sélectionné ────────────────────────────────────────────── */
+
+#g-fiche {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #9aa2ae;
+  border-left: 2px solid rgba(255, 255, 255, .09);
+  padding-left: 11px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+#g-fiche .g-f-nom {
+  color: #f0f2f6;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#g-fiche .g-f-type {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin: 3px 0 8px;
+}
+
+#g-fiche .g-f-detail { white-space: pre-wrap; word-break: break-word; }
+
+#g-fiche .g-f-voisins {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.g-voisin {
+  background: none;
+  border: 0;
+  text-align: left;
+  padding: 3px 0;
+  color: #8f97a3;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.g-voisin:hover { color: #d4af6a; }
+
+/* ── Moyeux et filtres ────────────────────────────────────────────────────── */
+
+.g-liste { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+
+.g-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 4px 5px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #aab1bc;
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+}
+
+.g-ligne:hover { background: rgba(255, 255, 255, .05); color: #e6e9ef; }
+.g-ligne[data-eteint="true"] { opacity: .34; }
+
+.g-pastille {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.g-ligne-nom {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-ligne-n {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: #5c6470;
+  flex: 0 0 auto;
+}
+
+/* ── Boutons ──────────────────────────────────────────────────────────────── */
+
+.g-btn {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 7px;
+  color: #c3cad4;
+  padding: 6px 13px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.g-btn:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.g-btn[data-actif="true"] {
+  background: rgba(212, 175, 106, .16);
+  border-color: rgba(212, 175, 106, .42);
+  color: #d4af6a;
+}
+
+.g-aide {
+  font-size: 11px;
+  color: #5c6470;
+  line-height: 1.5;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+  padding-top: 10px;
+}
+
+.g-avertissement {
+  font-size: 11.5px;
+  color: #d99a3c;
+  line-height: 1.5;
+}
+
+/* ── Téléphone ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 820px) {
+  #g-gauche, #g-droite {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    top: auto;
+    bottom: 12px;
+    max-height: 42vh;
+  }
+  /* Un seul panneau à la fois en bas : les deux superposés ne laisseraient
+   * plus rien voir du graphe, qui est tout l'intérêt de la page. */
+  #g-droite { display: none; }
+  #g-droite[data-ouvert="true"] { display: block; }
+  #g-gauche[data-cache="true"] { display: none; }
+  #g-outils { top: 14px; }
+}

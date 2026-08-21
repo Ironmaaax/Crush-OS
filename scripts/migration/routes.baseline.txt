@@ -54,6 +54,7 @@ GET     /api/globe/flights
 GET     /api/globe/weather
 GET     /api/google/auth/{service}
 GET     /api/google/callback/{service}
+GET     /api/graphe
 GET     /api/health
 GET     /api/initiatives
 GET     /api/local-music/player
@@ -109,6 +110,7 @@ GET     /command
 GET     /dashboard
 GET     /docs
 GET     /docs/oauth2-redirect
+GET     /graphe
 GET     /health
 GET     /login
 GET     /macropad
