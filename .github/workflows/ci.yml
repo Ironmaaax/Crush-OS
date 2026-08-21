@@ -64,7 +64,23 @@ jobs:
         # `pytest -m "not integration"` — les tests qui ont besoin de deps
         # lourdes (livekit, sounddevice, opencv chargé en bg) sont marqués
         # `@pytest.mark.integration` et exclus ici.
-        run: uv run pytest -m "not integration" -q
+        #
+        # Chaque échec est aussi émis en `::error::` : les annotations d'un run
+        # sont lisibles sans droits admin sur le dépôt, contrairement aux logs.
+        # Sans ça, un échec ne dit que « exit code 1 » à qui n'est pas admin —
+        # y compris quand on diagnostique une casse qui ne se reproduit pas en
+        # local (ici : Linux vs Windows).
+        run: |
+          set -uo pipefail
+          rc=0
+          uv run pytest -m "not integration" -q --tb=short -rf > pytest.out 2>&1 || rc=$?
+          cat pytest.out
+          if [ "$rc" -ne 0 ]; then
+            grep -E '^(FAILED|ERROR)' pytest.out | while IFS= read -r ligne; do
+              echo "::error title=pytest (lane rapide)::${ligne}"
+            done
+          fi
+          exit "$rc"
 
       - name: Snapshot routes — diff vs baseline
         # Routes byte-identiques à la baseline — gate inchangé depuis B.
@@ -113,7 +129,19 @@ jobs:
         run: uv sync --frozen --group dev --all-extras
 
       - name: Pytest (suite complète, incl. integration)
-        run: uv run pytest -q
+        # Même remontée en annotations que la lane rapide : c'est la seule sortie
+        # de cette étape qu'on puisse lire sans droits admin sur le dépôt.
+        run: |
+          set -uo pipefail
+          rc=0
+          uv run pytest -q --tb=short -rf > pytest.out 2>&1 || rc=$?
+          cat pytest.out
+          if [ "$rc" -ne 0 ]; then
+            grep -E '^(FAILED|ERROR)' pytest.out | while IFS= read -r ligne; do
+              echo "::error title=pytest (lane complete)::${ligne}"
+            done
+          fi
+          exit "$rc"
 
   # ───────────────────────────────────────────────────────────────────────────
   # B9 — INSTALL À FROID (CDC §B.9 — gates_B8_B9.md)
