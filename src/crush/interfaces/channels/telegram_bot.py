@@ -85,6 +85,19 @@ def get_telegram_channel() -> TelegramChannel | None:
     return _telegram_instance
 
 
+def _url_api(chemin: str) -> str:
+    """URL locale de l'API, construite depuis le port CONFIGURE.
+
+    Le port etait code en dur a 8000. Sur un deploiement qui ecoute ailleurs -- la
+    Pi est sur 8001 -- `/status` et `/initiatives` echouaient tous les deux sur
+    « All connection attempts failed », sans que rien n'indique la cause.
+
+    On force `127.0.0.1` et on n'utilise PAS `settings.host` : celui-ci vaut
+    souvent `0.0.0.0`, qui est une adresse d'ECOUTE. On ne s'y connecte pas.
+    """
+    return f"http://127.0.0.1:{settings.port}{chemin}"
+
+
 class TelegramChannel(ChannelAdapter):
     """Canal Telegram pour Crush.
 
@@ -251,7 +264,7 @@ class TelegramChannel(ChannelAdapter):
             import httpx
 
             async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get("http://localhost:8000/api/health")
+                r = await client.get(_url_api("/api/health"))
                 health = r.json()
             checks = health.get("checks", {})
             lines = []
@@ -276,7 +289,7 @@ class TelegramChannel(ChannelAdapter):
             import httpx
 
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get("http://localhost:8000/api/initiatives")
+                r = await client.get(_url_api("/api/initiatives"))
                 data = r.json()
             initiatives = [i for i in data.get("initiatives", []) if i.get("status") == "pending"]
             if not initiatives:

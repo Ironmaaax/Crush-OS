@@ -368,3 +368,31 @@ async def test_webhook_gateway_non_demarre() -> None:
     client = TestClient(test_app, raise_server_exceptions=False)
     r = client.post("/api/channels/telegram/webhook", json={})
     assert r.status_code == 503
+
+
+# ── URL locale de l'API appelee par le bot ───────────────────────────────────
+
+
+def test_l_url_api_suit_le_port_configure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le port etait code en dur a 8000 : sur un deploiement en 8001, /status et
+    /initiatives echouaient sur « All connection attempts failed »."""
+    from crush.interfaces.channels.telegram_bot import _url_api
+    from crush.kernel.settings import settings
+
+    monkeypatch.setattr(settings, "port", 8001)
+
+    assert _url_api("/api/health") == "http://127.0.0.1:8001/api/health"
+
+
+def test_l_url_api_n_utilise_jamais_le_host_d_ecoute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`settings.host` vaut souvent 0.0.0.0 — une adresse d'ECOUTE, pas de connexion."""
+    from crush.interfaces.channels.telegram_bot import _url_api
+    from crush.kernel.settings import settings
+
+    monkeypatch.setattr(settings, "host", "0.0.0.0")
+    monkeypatch.setattr(settings, "port", 8001)
+
+    url = _url_api("/api/initiatives")
+    assert "0.0.0.0" not in url
+    assert url.startswith("http://127.0.0.1:8001")
+
