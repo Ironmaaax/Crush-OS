@@ -64,6 +64,10 @@ VISION_DATA_DIR: Path = PROJECT_ROOT / "vision_data"
 FACES_DIR: Path = VISION_DATA_DIR / "faces"
 WORKSPACE_DIR: Path = PROJECT_ROOT / "workspace"
 
+# Archives de la mémoire. Hors de memory_data/ à dessein : une archive rangée
+# dans le dossier qu'elle sauvegarde finit par se retrouver dans la suivante.
+SAUVEGARDES_DIR: Path = PROJECT_ROOT / "sauvegardes"
+
 # ── Assets / code-as-data (trackés en git) ────────────────────────────────
 PROMPTS_DIR: Path = PROJECT_ROOT / "prompts"
 CONFIG_DIR: Path = PROJECT_ROOT / "config"

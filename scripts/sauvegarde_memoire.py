@@ -1,120 +1,81 @@
 #!/usr/bin/env python3
 # Copyright (C) 2026 Maxime Song
-# This file is part of CRUSH-OS,   .
 
+"""Archive la mémoire de l'assistant — déclenchement manuel.
 
-"""Archive la mémoire de l'assistant.
+La logique vit désormais dans `crush.providers.memory.sauvegarde`, appelée
+automatiquement chaque nuit par le scheduler (réglage `BACKUP_HOUR`). Ce script
+reste le moyen de déclencher une passe à la main : avant une migration, avant de
+toucher à la base, ou simplement pour vérifier que la chaîne fonctionne sans
+attendre 4 h du matin.
 
-Tout ce qu'il sait de son utilisateur — la base SQLite, les fichiers
-thématiques, les sessions, le registre de consommation — vit dans `memory_data/`,
-sur une carte SD. Les cartes SD meurent, et celle-ci tourne en écriture
-24 heures sur 24. Une mémoire perdue ne se reconstruit pas : c'est la seule
-donnée du projet qui n'existe nulle part ailleurs.
-
-Le `.env` est délibérément EXCLU : une archive de sauvegarde se recopie, se
-transfère, se laisse traîner, et n'a aucune raison de transporter des clés API.
+    python scripts/sauvegarde_memoire.py
+    python scripts/sauvegarde_memoire.py --etat   # ne sauvegarde pas, dit juste où on en est
 """
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 import os
-import shutil
-import sqlite3
-import tarfile
-import tempfile
-from datetime import datetime
-from pathlib import Path
+import sys
 
-RACINE = Path(__file__).resolve().parent.parent
-SOURCE = RACINE / "memory_data"
-DESTINATION = RACINE / "sauvegardes"
-
-# Au-delà, les plus anciennes partent : sans purge, une sauvegarde quotidienne
-# finirait par remplir la carte qu'elle est censée protéger.
-_ARCHIVES_CONSERVEES = 7
-
-# Exclus de l'archive : volumineux et intégralement reconstructibles.
-_EXCLUS = {"vector_index", "rpc_workspace"}
+from crush.kernel.paths import MEMORY_DATA_DIR, SAUVEGARDES_DIR
+from crush.kernel.settings import settings
+from crush.providers.memory.sauvegarde import SauvegardeMemoire
 
 
-def _copie_coherente_sqlite(source: Path, cible: Path) -> bool:
-    """Copie une base SQLite en cours d'utilisation, sans la corrompre.
-
-    Le service écrit en permanence, en mode WAL. Copier le fichier à l'octet
-    pendant une transaction produit une archive qui s'ouvre mais dont il manque
-    la fin — une sauvegarde qu'on croit avoir et qui n'existe pas. L'API
-    `backup` de SQLite prend un instantané cohérent.
-    """
-    try:
-        with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as src, sqlite3.connect(
-            cible
-        ) as dst:
-            src.backup(dst)
-        return True
-    except sqlite3.Error:
-        return False
-
-
-def _purger(dossier: Path) -> int:
-    archives = sorted(dossier.glob("memoire-*.tar.gz"))
-    a_supprimer = archives[:-_ARCHIVES_CONSERVEES] if len(archives) > _ARCHIVES_CONSERVEES else []
-    for vieille in a_supprimer:
-        vieille.unlink(missing_ok=True)
-    return len(a_supprimer)
+def _construire() -> SauvegardeMemoire:
+    return SauvegardeMemoire(
+        source=MEMORY_DATA_DIR,
+        destination=SAUVEGARDES_DIR,
+        conserver=settings.backup_keep,
+        copier_vers=settings.backup_copy_to,
+    )
 
 
 def main() -> int:
-    if not SOURCE.is_dir():
-        print(f"Rien à sauvegarder : {SOURCE} n'existe pas.")
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--etat", action="store_true", help="affiche l'etat sans sauvegarder")
+    args = ap.parse_args()
+
+    sauvegarde = _construire()
+
+    if args.etat:
+        age = sauvegarde.age_heures()
+        derniere = sauvegarde.derniere()
+        if age is None:
+            print("Aucune archive. La mémoire n'existe qu'en un seul exemplaire.")
+            return 1
+        print(f"Dernière archive : {derniere.name if derniere else '?'}, il y a {age:.0f} h.")
+        if not settings.backup_copy_to.strip():
+            print(
+                "BACKUP_COPY_TO n'est pas renseigné : les archives sont sur le support\n"
+                "qu'elles protègent, ce qui ne couvre pas sa panne."
+            )
+        return 0
+
+    resultat = asyncio.run(sauvegarde.sauvegarder())
+
+    if not resultat.reussie:
+        print(f"Échec : {resultat.erreur}", file=sys.stderr)
         return 1
 
-    DESTINATION.mkdir(parents=True, exist_ok=True)
-    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
-    archive = DESTINATION / f"memoire-{horodatage}.tar.gz"
-
-    bases_traitees = 0
-    with tempfile.TemporaryDirectory() as tmp:
-        instantanes = Path(tmp)
-        with tarfile.open(archive, "w:gz") as tar:
-            for chemin in sorted(SOURCE.rglob("*")):
-                if not chemin.is_file():
-                    continue
-                relatif = chemin.relative_to(SOURCE)
-                if relatif.parts and relatif.parts[0] in _EXCLUS:
-                    continue
-                # Les annexes -wal et -shm n'ont pas de sens hors de leur base :
-                # l'instantané ci-dessous les intègre déjà.
-                if chemin.suffix in {".db-wal", ".db-shm"} or chemin.name.endswith(
-                    ("-wal", "-shm")
-                ):
-                    continue
-
-                if chemin.suffix == ".db":
-                    copie = instantanes / relatif.name
-                    if _copie_coherente_sqlite(chemin, copie):
-                        tar.add(copie, arcname=str(relatif))
-                        bases_traitees += 1
-                        continue
-                    # Repli : mieux vaut une copie brute que pas de sauvegarde,
-                    # mais on le dit.
-                    print(f"  (instantané impossible pour {relatif}, copie brute)")
-                tar.add(chemin, arcname=str(relatif))
-
-    taille_mo = archive.stat().st_size / 1024**2
-    supprimees = _purger(DESTINATION)
-    libre_go = shutil.disk_usage(RACINE)[2] / 1024**3
-
+    mo = resultat.octets / 1024**2
     print(
-        f"Mémoire sauvegardée : {archive.name}, {taille_mo:.1f} Mo, "
-        f"{bases_traitees} base(s) en instantané cohérent. "
-        f"{supprimees} archive(s) ancienne(s) supprimée(s), "
-        f"{len(list(DESTINATION.glob('memoire-*.tar.gz')))} conservée(s). "
-        f"{libre_go:.0f} Go libres sur le disque."
+        f"Mémoire sauvegardée : {resultat.archive}, {mo:.1f} Mo, "
+        f"{resultat.bases_instantanees} base(s) en instantané cohérent, "
+        f"{resultat.purgees} archive(s) ancienne(s) purgée(s)."
     )
-    print(
-        "Cette archive est sur la MÊME carte SD que l'original : "
-        "la recopier ailleurs est ce qui la rend utile."
-    )
+    if resultat.copiee_hors_machine:
+        print(f"Copiée hors machine vers {settings.backup_copy_to}.")
+    elif resultat.erreur:
+        print(f"Attention : {resultat.erreur}", file=sys.stderr)
+    else:
+        print(
+            "Cette archive est sur le MÊME support que l'original : renseigner\n"
+            "BACKUP_COPY_TO est ce qui la rend utile contre une panne de support."
+        )
     return 0
 
 

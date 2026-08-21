@@ -24,13 +24,14 @@ pire qu'une page vide, parce qu'on cesse de vérifier.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
 
 from crush.kernel import quota_cartes
-from crush.kernel.paths import MEMORY_DATA_DIR
+from crush.kernel.paths import MEMORY_DATA_DIR, SAUVEGARDES_DIR
 from crush.kernel.remote_agents import registry
 from crush.kernel.settings import settings
 
@@ -143,21 +144,97 @@ def _memoire() -> list[dict]:
             )
         ]
     taille = base.stat().st_size / 1024**2
-    sauvegardes = sorted((MEMORY_DATA_DIR.parent / "sauvegardes").glob("memoire-*.tar.gz"))
     return [
         _maillon("Mémoire", _OK, f"{taille:.1f} Mo", "", "memoire"),
-        _maillon(
-            "Sauvegarde",
-            _OK if sauvegardes else _DEGRADE,
-            f"dernière : {sauvegardes[-1].name.removeprefix('memoire-').removesuffix('.tar.gz')}"
-            if sauvegardes
-            else "aucune archive — la mémoire n'existe qu'en un seul exemplaire",
-            ""
-            if sauvegardes
-            else "Lancer le script « sauvegarde_memoire », puis recopier l'archive ailleurs.",
-            "memoire",
-        ),
+        _sauvegarde(),
+        _copie_hors_machine(),
     ]
+
+
+# Au-delà, la passe quotidienne ne tourne manifestement plus. 36 h laisse passer
+# une machine éteinte une nuit sans crier au loup.
+_AGE_ALERTE_H = 36
+
+
+def _age_lisible(heures: float) -> str:
+    if heures < 1:
+        return "il y a moins d'une heure"
+    if heures < 48:
+        return f"il y a {int(heures)} h"
+    return f"il y a {int(heures / 24)} jours"
+
+
+def _archives(dossier: Path) -> list[Path]:
+    if not dossier.is_dir():
+        return []
+    return sorted(dossier.glob("memoire-*.tar.gz"))
+
+
+def _sauvegarde() -> dict:
+    """L'ÂGE de la dernière archive, pas sa simple existence.
+
+    Une archive de trois mois donnait un voyant vert et une fausse assurance :
+    c'est exactement le cas où l'on croit être couvert sans l'être.
+    """
+    archives = _archives(SAUVEGARDES_DIR)
+    if not archives:
+        return _maillon(
+            "Sauvegarde",
+            _ABSENT,
+            "aucune archive — la mémoire n'existe qu'en un seul exemplaire",
+            "Vérifier BACKUP_ENABLED, ou lancer « python scripts/sauvegarde_memoire.py ».",
+            "memoire",
+        )
+    age = (datetime.now().timestamp() - archives[-1].stat().st_mtime) / 3600
+    if age > _AGE_ALERTE_H:
+        return _maillon(
+            "Sauvegarde",
+            _DEGRADE,
+            f"dernière {_age_lisible(age)} — la passe quotidienne ne tourne plus",
+            "Vérifier BACKUP_ENABLED et les journaux du service.",
+            "memoire",
+        )
+    return _maillon(
+        "Sauvegarde",
+        _OK,
+        f"dernière {_age_lisible(age)}, {len(archives)} archive(s) conservée(s)",
+        "",
+        "memoire",
+    )
+
+
+def _copie_hors_machine() -> dict:
+    """Une archive sur le support qu'elle protège ne protège pas de sa panne.
+
+    C'est le maillon qui manquait : on pouvait avoir sept archives fraîches et
+    tout perdre avec la carte SD.
+    """
+    cible = settings.backup_copy_to.strip()
+    if not cible:
+        return _maillon(
+            "Copie hors machine",
+            _DEGRADE,
+            "aucune — les archives vivent sur le support qu'elles protègent",
+            "Renseigner BACKUP_COPY_TO (partage réseau, clé USB, dossier synchronisé).",
+            "memoire",
+        )
+    distantes = _archives(Path(cible).expanduser())
+    if not distantes:
+        return _maillon(
+            "Copie hors machine",
+            _DEGRADE,
+            f"{cible} configuré mais vide — la copie échoue ou le support est absent",
+            "Vérifier que la destination est montée et inscriptible.",
+            "memoire",
+        )
+    age = (datetime.now().timestamp() - distantes[-1].stat().st_mtime) / 3600
+    return _maillon(
+        "Copie hors machine",
+        _OK if age <= _AGE_ALERTE_H else _DEGRADE,
+        f"{cible} — dernière {_age_lisible(age)}",
+        "" if age <= _AGE_ALERTE_H else "La copie ne se fait plus ; vérifier la destination.",
+        "memoire",
+    )
 
 
 def _autonomie() -> list[dict]:

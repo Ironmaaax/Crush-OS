@@ -42,6 +42,7 @@ from crush.kernel.schemas import (
     FactObservation,
     FactRelation,
     FactStatus,
+    ResultatSauvegarde,
     UsageEntry,
 )
 
@@ -496,3 +497,17 @@ class SkillLab(Protocol):
     async def propose_from_trajectory(
         self, trajectory: dict, source_event_id: str | None = ...
     ) -> Any | None: ...  # noqa: ANN401 — SkillRecord (capabilities/skills/lifecycle.py)
+
+
+@runtime_checkable
+class MemoryBackup(Protocol):
+    """Archivage de la memoire (cf. providers/memory/sauvegarde.py).
+
+    Utilise par `engine/background/scheduler.py` pour la passe quotidienne. La
+    memoire est la seule donnee du projet qui n'existe nulle part ailleurs : sans
+    passe planifiee, elle tient en un exemplaire sur le support d'une machine qui
+    ecrit en continu.
+    """
+
+    async def sauvegarder(self) -> ResultatSauvegarde: ...
+    def age_heures(self) -> float | None: ...

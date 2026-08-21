@@ -523,3 +523,21 @@ class Session:
         self.messages.append({"role": role, "content": content})
         if self._persist:
             self._persist(role, content)
+
+
+@dataclass
+class ResultatSauvegarde:
+    """Ce qu'une passe de sauvegarde a reellement fait (cf. providers/memory/sauvegarde.py).
+
+    Rendu structure plutot qu'un booleen : le scheduler doit pouvoir distinguer
+    « archive ecrite mais copie hors machine impossible » de « rien n'a ete ecrit ».
+    Le premier cas ne merite pas de reveiller son utilisateur, le second si.
+    """
+
+    reussie: bool
+    archive: str | None = None
+    octets: int = 0
+    bases_instantanees: int = 0
+    purgees: int = 0
+    copiee_hors_machine: bool = False
+    erreur: str | None = None

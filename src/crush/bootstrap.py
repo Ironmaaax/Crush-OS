@@ -94,7 +94,7 @@ from crush.kernel.events import (
     MissionCompleted,
     NotificationRequested,
 )
-from crush.kernel.paths import CONFIG_DIR
+from crush.kernel.paths import CONFIG_DIR, MEMORY_DATA_DIR, SAUVEGARDES_DIR
 from crush.kernel.settings import Settings
 from crush.kernel.settings import settings as _default_settings
 from crush.providers.audio.stt import SpeechToText, create_stt
@@ -113,6 +113,7 @@ from crush.providers.memory.index import MemoryIndex
 from crush.providers.memory.ingest import MemoryIngest
 from crush.providers.memory.kernel import MemoryKernel
 from crush.providers.memory.mirror import MemoryMirror
+from crush.providers.memory.sauvegarde import SauvegardeMemoire
 from crush.providers.memory.search import FTSIndex, VectorIndex
 from crush.providers.memory.sessions import SessionStore
 from crush.providers.memory.topics import TopicStore
@@ -522,6 +523,16 @@ def build(
 
     # ── 15. Engine L2 — Scheduler ──────────────────────────────────────────
 
+    # Archivage de la mémoire. Construit ici parce que l'engine n'a pas le droit
+    # d'importer providers (RÈGLE 3) : le scheduler le reçoit par le Protocol
+    # `MemoryBackup`. Sans cette passe, la mémoire ne tenait qu'en un exemplaire.
+    sauvegarde_memoire = SauvegardeMemoire(
+        source=MEMORY_DATA_DIR,
+        destination=SAUVEGARDES_DIR,
+        conserver=settings.backup_keep,
+        copier_vers=settings.backup_copy_to,
+    )
+
     scheduler = Scheduler(
         proactive=proactive_queue,
         auto_dream=auto_dream,
@@ -535,6 +546,7 @@ def build(
         # clients connectes a cet instant — c'est-a-dire personne, la
         # plupart du temps.
         notifications=notifications,
+        sauvegarde=sauvegarde_memoire,
     )
 
     # ── 16. Câblage des événements (Phase D — kernel.events.bus) ───────────

@@ -495,6 +495,29 @@ class Settings(BaseSettings):
     # ── Proactivité ───────────────────────────────────────────
     home_city: str = Field(default="Paris", description="Ville pour la météo du briefing.")
     briefing_hour: int = Field(default=9, description="Heure du morning briefing (0-23).")
+
+    # ── Sauvegarde de la memoire ──────────────────────────────
+    # La memoire est la seule donnee irremplacable du projet. Ces reglages
+    # existent parce qu'elle ne tenait qu'en un exemplaire : le script
+    # d'archivage etait la, mais rien ne l'appelait.
+    backup_enabled: bool = Field(
+        default=True, description="Passe de sauvegarde quotidienne de memory_data/."
+    )
+    backup_hour: int = Field(
+        default=4,
+        description="Heure de la sauvegarde (0-23). Apres le Curator nocturne, pas pendant.",
+    )
+    backup_keep: int = Field(
+        default=7, description="Nombre d'archives conservees ; les plus anciennes sont purgees."
+    )
+    backup_copy_to: str = Field(
+        default="",
+        description=(
+            "Dossier hors machine ou recopier l'archive (partage reseau, cle USB, "
+            "dossier synchronise). Vide = archive sur le meme support que l'original, "
+            "ce qui ne protege pas d'une panne de ce support."
+        ),
+    )
     calendar_reminder_minutes: int = Field(
         default=10,
         description="Délai de rappel avant un event calendar (minutes).",

@@ -26,6 +26,7 @@ from crush.engine.background.routines import (
 from crush.kernel.contracts import (
     AutoDreamer,
     CalendarReadTool,
+    MemoryBackup,
     NotionReadTool,
 )
 from crush.kernel.settings import Settings
@@ -62,6 +63,7 @@ class Scheduler:
         skill_lab: object | None = None,
         curator: object | None = None,
         notifications: NotificationQueue | None = None,
+        sauvegarde: MemoryBackup | None = None,
     ) -> None:
         self._proactive = proactive
         self._auto_dream = auto_dream
@@ -70,6 +72,8 @@ class Scheduler:
         self._notion_tool = notion_tool  # Phase D — injecté plutôt qu'instancié dans la boucle
         self._skill_lab = skill_lab  # PHASE 4 — SkillLab pour polling nocturne
         self._curator = curator  # PHASE 6 — Curator nocturne
+        # Archivage de la mémoire. Injecté (RÈGLE 3 : l'engine n'importe pas providers).
+        self._sauvegarde = sauvegarde
         # File des notifications, glissées en fin de réponse par le Gateway.
         # `_proactive.broadcast` ne touche que les clients CONNECTÉS à l'instant :
         # sur une machine allumée en permanence et consultée par intermittence,
@@ -93,6 +97,10 @@ class Scheduler:
             )
         if self._curator is not None:
             self._tasks.append(asyncio.create_task(self._curator_loop(), name="scheduler-curator"))
+        if self._sauvegarde is not None and self._settings.backup_enabled:
+            self._tasks.append(
+                asyncio.create_task(self._sauvegarde_loop(), name="scheduler-sauvegarde")
+            )
         logger.info("Scheduler started", tasks=len(self._tasks))
 
     def stop(self) -> None:
@@ -161,6 +169,19 @@ class Scheduler:
                 "description": "Analyse nocturne des sessions",
                 "next_run": _next_datetime(3).isoformat(),
                 "interval": "quotidien",
+            },
+            {
+                "name": "Sauvegarde de la mémoire",
+                "description": (
+                    f"Archive memory_data/ à {self._settings.backup_hour}h00, "
+                    f"{self._settings.backup_keep} archives conservées"
+                ),
+                "next_run": (
+                    _next_datetime(self._settings.backup_hour).isoformat()
+                    if self._settings.backup_enabled
+                    else None
+                ),
+                "interval": "quotidien" if self._settings.backup_enabled else "désactivée",
             },
         ]
 
@@ -406,3 +427,50 @@ class Scheduler:
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Curator scan échec", error=str(exc))
+
+    # ── Sauvegarde de la mémoire ──────────────────────────────
+
+    # Programmée APRÈS le Curator (3h + 10 min) : celui-ci archive des faits et
+    # propose des patches. Sauvegarder avant lui capturerait un état qu'il va
+    # modifier dans les minutes qui suivent.
+
+    async def _sauvegarde_loop(self) -> None:
+        """Archive la mémoire une fois par jour, et ne parle qu'en cas de problème.
+
+        Le silence en cas de succès est volontaire. Une notification quotidienne
+        « tout va bien » finit par ne plus être lue, et c'est alors l'alerte utile
+        qui passe inaperçue. On ne signale donc que ce qui demande une action.
+        """
+        if self._sauvegarde is None:
+            return
+        while True:
+            delay = _seconds_until(self._settings.backup_hour)
+            logger.debug("Sauvegarde mémoire planifiée", seconds=int(delay))
+            await asyncio.sleep(delay)
+            try:
+                resultat = await self._sauvegarde.sauvegarder()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Sauvegarde mémoire échec", error=str(exc))
+                self._signaler(
+                    f"La sauvegarde de ma mémoire a échoué ({type(exc).__name__}). "
+                    "Elle n'existe donc qu'en un seul exemplaire."
+                )
+                continue
+
+            if not resultat.reussie:
+                logger.warning("Sauvegarde mémoire échec", error=resultat.erreur)
+                self._signaler(
+                    f"La sauvegarde de ma mémoire a échoué : {resultat.erreur}. "
+                    "Elle n'existe donc qu'en un seul exemplaire."
+                )
+                continue
+
+            # Archive écrite mais copie hors machine impossible : l'archive existe,
+            # elle est juste sur le support qu'elle est censée protéger. Ça vaut un
+            # mot, pas une alarme.
+            if resultat.erreur:
+                self._signaler(
+                    f"Mémoire sauvegardée ({resultat.archive}), mais {resultat.erreur} "
+                    "L'archive est donc sur le même support que l'original."
+                )
+
