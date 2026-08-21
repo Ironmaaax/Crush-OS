@@ -1,0 +1,26 @@
+# Unité systemd — prévient quand une autre unité a échoué.
+#
+# Installée par `scripts/install_pi.sh`, qui substitue __CRUSH_DIR__ et
+# __CRUSH_USER__. Ne pas éditer la copie dans /etc/systemd/system.
+#
+# Gabarit (`@`) : l'instance porte le nom de l'unité tombée, passé par
+# `OnFailure=crush-alerte@%n.service`. Un seul fichier couvre donc n'importe
+# quelle unité qu'on voudra surveiller plus tard.
+#
+# QUAND CECI SE DECLENCHE : `crush-api` porte `Restart=always`, mais aussi
+# `StartLimitBurst=5` sur 5 minutes. Au-delà, systemd RENONCE et l'unité passe
+# en `failed` — c'est ce moment précis que cette alerte attrape. Le cas
+# « redémarre en boucle sans atteindre la limite » et le cas « process vivant
+# mais API muette » échappent à systemd : ils sont couverts par crush-sante.
+[Unit]
+Description=Alerte de panne pour %i
+# Pas de Requires sur le réseau : si le réseau est tombé, on veut quand même
+# tenter l'envoi. curl échouera, le script le dira au journal, et rien ne casse.
+
+[Service]
+Type=oneshot
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+ExecStart=/usr/bin/env bash __CRUSH_DIR__/scripts/alerte.sh "Crush : systemd a renonce a relancer %i apres 5 echecs en 5 minutes. Le service est arrete."
+# Une alerte qui pend n'alerte plus : au-delà, on abandonne.
+TimeoutStartSec=60

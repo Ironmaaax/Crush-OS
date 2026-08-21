@@ -1,0 +1,21 @@
+# Timer — cadence du contrôle de santé.
+#
+# 5 minutes : assez court pour qu'une panne nocturne ne dure pas jusqu'au matin,
+# assez long pour ne rien coûter (un curl local et un `systemctl show`).
+#
+# L'anti-spam n'est PAS ici mais dans le script : il n'alerte que sur les
+# transitions. Le timer peut donc tourner sans jamais devenir bavard.
+[Unit]
+Description=Assistant — controle de sante toutes les 5 minutes
+
+[Timer]
+# Laisse l'API démarrer avant le premier contrôle, sinon un reboot déclenche une
+# fausse alerte le temps que le service monte.
+OnBootSec=3min
+OnUnitActiveSec=5min
+# Évite que tous les timers du système partent à la même seconde.
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

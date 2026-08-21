@@ -1,0 +1,22 @@
+# Unité systemd — contrôle actif de l'assistant.
+#
+# Installée par `scripts/install_pi.sh`. Déclenchée par crush-sante.timer, pas
+# au boot : voir le timer pour la cadence.
+#
+# Interroge réellement l'API et lit le compteur de redémarrages de systemd, donc
+# attrape les deux pannes qu'un `OnFailure=` ne voit pas : le process vivant mais
+# muet, et la boucle de redémarrage sous la limite.
+[Unit]
+Description=Assistant — controle de sante et alerte
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+ExecStart=/usr/bin/env bash __CRUSH_DIR__/scripts/sante.sh
+# Le script sort 1 quand il constate une panne — c'est son travail, pas une
+# erreur d'exécution. Sans ceci, le journal se remplirait d'unités « failed »
+# et un OnFailure sur cette unité s'auto-déclencherait en boucle.
+SuccessExitStatus=0 1
+TimeoutStartSec=90

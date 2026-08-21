@@ -14,7 +14,8 @@
 #   2. installe les paquets système du cœur (aucune compilation) ;
 #   3. installe uv, puis synchronise les dépendances Python (cœur seul) ;
 #   4. génère un jeton d'accès et active l'authentification si besoin ;
-#   5. installe et active les unités systemd ;
+#   5. installe et active les unités systemd, dont la surveillance qui
+#      prévient par Telegram quand l'assistant tombe ;
 #   6. affiche la marche à suivre pour l'accès HTTPS via Tailscale.
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -178,14 +179,38 @@ install_unit() {
 }
 
 install_unit crush-api.service
+# Surveillance : rien ne prévenait quand l'assistant tombait. `crush-alerte@` est
+# un GABARIT, on ne l'active pas — il est instancié par le `OnFailure=` du
+# drop-in. Seul le timer s'active.
+install_unit crush-alerte@.service
+install_unit crush-sante.service
+install_unit crush-sante.timer
+
+# Drop-in et non réécriture de crush-api.service : ce dossier contient déjà
+# `docker-rootless.conf`, et réécrire l'unité principale risquerait de
+# l'orpheliner — cf. le commentaire dans alerte.conf.
+sudo mkdir -p "$UNIT_DIR/crush-api.service.d"
+sudo cp "$PROJECT_DIR/deploy/systemd/crush-api.service.d/alerte.conf"         "$UNIT_DIR/crush-api.service.d/alerte.conf"
+ok "alerte.conf installé (drop-in crush-api)"
+
+chmod +x "$PROJECT_DIR/scripts/alerte.sh" "$PROJECT_DIR/scripts/sante.sh"
 
 sudo systemctl daemon-reload
 
-ENABLED_UNITS=(crush-api.service)
+ENABLED_UNITS=(crush-api.service crush-sante.timer)
 
 sudo systemctl enable "${ENABLED_UNITS[@]}" >/dev/null 2>&1
 sudo systemctl restart "${ENABLED_UNITS[@]}"
 ok "Services activés au démarrage et lancés"
+
+# Le canal d'alerte est-il réellement joignable ? Le vérifier maintenant évite de
+# découvrir, le jour de la panne, qu'aucun jeton n'était configuré.
+if bash "$PROJECT_DIR/scripts/alerte.sh" "Crush : surveillance installée. Ce message confirme que le canal d'alerte fonctionne." >/dev/null 2>&1; then
+  ok "Canal d'alerte vérifié (message de test envoyé)"
+else
+  warn "Canal d'alerte indisponible — renseigne TELEGRAM_BOT_TOKEN et TELEGRAM_OWNER_ID,
+       sinon une panne ne te sera jamais signalée."
+fi
 
 # ── 6. Accès réseau ───────────────────────────────────────────────────────────
 step "Accès depuis le téléphone et le PC"

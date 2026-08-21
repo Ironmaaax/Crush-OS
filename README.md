@@ -364,6 +364,36 @@ TELEGRAM_ENABLED=true
 
 ---
 
+## Surveillance : être prévenu quand ça tombe
+
+Rien ne signalait une panne : il fallait s'en apercevoir soi-même. Deux mécanismes
+complémentaires, installés par `install_pi.sh`, couvrent deux pannes différentes.
+
+**`crush-sante.timer`** interroge l'API toutes les 5 minutes et lit le compteur de
+redémarrages de systemd. Il attrape ce que systemd ne voit pas : un process vivant
+mais qui ne répond plus, et une boucle de redémarrage sous la limite d'échecs.
+
+**`crush-alerte@`** est branché en `OnFailure=` par un drop-in. `crush-api` porte
+`Restart=always` mais aussi `StartLimitBurst=5` : au-delà de 5 échecs en 5 minutes,
+systemd renonce, et c'est ce moment précis que cette unité signale.
+
+Les alertes partent par Telegram, via `scripts/alerte.sh` — du bash et `curl`, sans
+dépendance à l'application, qui peut justement être en panne. L'alerte ne se déclenche
+que sur les **transitions** : un message quand ça tombe, un quand ça revient. Un
+contrôle toutes les 5 minutes sur un service mort enverrait douze messages par heure,
+et la première réaction serait de couper les notifications.
+
+```bash
+bash scripts/sante.sh --etat   # ce que la surveillance retient, sans rien envoyer
+bash scripts/alerte.sh "test"  # vérifier que le canal fonctionne
+```
+
+**Ce que ça ne couvre pas** : la machine éteinte. Rien tournant sur la Pi ne peut le
+signaler — il faut un observateur extérieur.
+
+---
+
+
 ## Développement
 
 ```bash
