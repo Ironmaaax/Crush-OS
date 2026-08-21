@@ -6,14 +6,18 @@
 ## 0. Avertissement   (à lire avant de « participer »)
 
 Ce n'est **pas** un projet B+D. C'est le projet personnel de **Max Ea**
-(`@Ironmaaax`), sous **Proprietary Source License** (© 2026) :
+(`@Ironmaaax`), sous **GNU AGPL-3.0-or-later** :
 
-- ✅ Autorisé : lire le code (perso / éducatif), l'exécuter en privé.
-- ❌ Interdit sans **accord écrit de l'auteur** : modifier, créer une œuvre dérivée,
-  contribuer, redistribuer, héberger pour des tiers, usage commercial.
+- ✅ Autorisé : lire, exécuter, modifier, créer une œuvre dérivée, redistribuer,
+  y compris pour un usage commercial.
+- ⚠️ Condition : toute redistribution, **y compris l'exposition du logiciel à
+  travers un réseau** (§13), doit fournir le code source correspondant sous cette
+  même licence.
 
-**Conséquence** : toute contribution suppose d'abord un accord explicite de l'auteur
-(Max.Ea@gmail.com). Le reste de ce document suppose cet accord obtenu.
+Une version antérieure de ce document annonçait une « Proprietary Source License »
+interdisant la modification et la redistribution. C'était faux : le dépôt dérive
+d'un travail sous AGPL-3.0, et cette licence accorde précisément ces droits — on
+ne peut pas les retirer en aval.
 
 ---
 
@@ -22,7 +26,7 @@ Ce n'est **pas** un projet B+D. C'est le projet personnel de **Max Ea**
 | Champ | Valeur |
 |---|---|
 | Nom | CRUSH-OS (`crush-os`) — assistant personnel IA, texte + voix temps réel, self-hosted |
-| Auteur /   | Max Ea — Proprietary Source License |
+| Auteur /   | Max Ea — GNU AGPL-3.0-or-later |
 | Version | `0.2.0` (tag `v0.2.0-architecture`), post-refonte « Opération Squelette » |
 | Langage | Python 3.11 (`>=3.11,<3.14`), tout async |
 | Volume | ~34 500 lignes / 220 modules dans `src/crush/` (les docs citent ~46k au total) |
