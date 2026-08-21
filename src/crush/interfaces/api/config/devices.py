@@ -280,13 +280,6 @@ async def get_connectors() -> list:
             "status": "on" if _env_ok("GOOGLE_API_KEY") else "off",
         },
         {
-            "name": "LiveKit",
-            "sub": "agent vocal temps réel",
-            "status": "on"
-            if _env_ok("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")
-            else "off",
-        },
-        {
             "name": "Deepgram",
             "sub": "STT alternatif",
             "status": "on" if _env_ok("DEEPGRAM_API_KEY") else "off",

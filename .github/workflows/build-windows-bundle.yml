@@ -20,7 +20,6 @@ permissions:
 jobs:
   build:
     # IMPÉRATIF : bundle Windows (Python portable Windows + binaires natifs +
-    # livekit-server.exe). Ne se build PAS sur Ubuntu.
     runs-on: windows-latest
     timeout-minutes: 90
 
@@ -35,9 +34,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Script de build EXISTANT, inchangé sauf l'appel API livekit authentifié.
-      # GITHUB_TOKEN : évite le rate-limit anonyme (60/h) sur les IP partagées des
-      # runners, au moment précis (release) où on ne veut pas découvrir un échec.
       - name: Build offline bundle
         shell: pwsh
         # La sortie du script est aussi remontée en `::error::` quand il tombe :
@@ -64,11 +60,8 @@ jobs:
             }
             exit 1
           }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Vérif PAR CHEMIN de chaque brique critique dans bundle/ AVANT de zipper.
-      # Attrape la perte partielle (ex. livekit-server.exe manquant) que le seul
       # contrôle de taille raterait (bundle encore ~650 MB sans lui).
       - name: Vérifier que le bundle est complet
         shell: pwsh
@@ -78,7 +71,6 @@ jobs:
             "bundle\python\python.exe",
             "bundle\.venv\Scripts\python.exe",
             "bundle\bin\uv.exe",
-            "bundle\bin\livekit-server.exe",
             "bundle\models\yolov8n.pt",
             "bundle\models\piper\fr_FR-upmc-medium.onnx",
             "bundle\models\piper\fr_FR-upmc-medium.onnx.json"
@@ -148,7 +140,6 @@ jobs:
             "crush-OS/bundle/python/python.exe",
             "crush-OS/bundle/.venv/Scripts/python.exe",
             "crush-OS/bundle/bin/uv.exe",
-            "crush-OS/bundle/bin/livekit-server.exe",
             "crush-OS/bundle/models/yolov8n.pt",
             "crush-OS/bundle/models/piper/fr_FR-upmc-medium.onnx",
             "crush-OS/bundle/models/piper/fr_FR-upmc-medium.onnx.json",
@@ -220,5 +211,3 @@ jobs:
             ${{ env.ZIP_PATH }}
             ${{ env.SHA256_FILE }}
           fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

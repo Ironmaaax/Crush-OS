@@ -27,7 +27,7 @@ mkdir -p "$BUNDLE_ROOT" "$MODELS_DIR" "$PIPER_DIR" "$BIN_DIR"
 # python trampoline, which is NOT relocatable across machines. The std venv
 # reads `home` from pyvenv.cfg, so it can be re-homed on the target machine
 # (see scripts/release/rehome_bundle.sh).
-echo "[1/6] Embed relocatable Python into bundle/python"
+echo "[1/5] Embed relocatable Python into bundle/python"
 rm -rf "$PYTHON_DIR"
 PY_INSTALL_CACHE="$BUNDLE_ROOT/.python-install"
 rm -rf "$PY_INSTALL_CACHE"
@@ -52,7 +52,7 @@ if [[ ! -x "$BUNDLE_BASE_PYTHON" ]]; then
   exit 1
 fi
 
-echo "[2/6] Create relocatable venv (std venv --copies)"
+echo "[2/5] Create relocatable venv (std venv --copies)"
 rm -rf "$VENV_PATH"
 "$BUNDLE_BASE_PYTHON" -m venv --copies "$VENV_PATH"
 BUNDLE_PYTHON="$VENV_PATH/bin/python"
@@ -61,15 +61,15 @@ if [[ ! -x "$BUNDLE_PYTHON" ]]; then
   exit 1
 fi
 
-echo "[3/6] Install deps + crush into venv"
+echo "[3/5] Install deps + crush into venv"
 uv pip install --python "$BUNDLE_PYTHON" -e ".[vision]"
 "$BUNDLE_PYTHON" -c "import crush.setup_app"
 
-echo "[4/6] Copy uv binary"
+echo "[4/5] Copy uv binary"
 cp "$(command -v uv)" "$BIN_DIR/uv"
 chmod +x "$BIN_DIR/uv"
 
-echo "[5/6] Download ML models"
+echo "[5/5] Download ML models"
 if [[ ! -f yolov8n.pt ]]; then
   uv run --python "$BUNDLE_PYTHON" python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
 fi
@@ -83,49 +83,10 @@ if [[ ! -f "$PIPER_ONNX" ]]; then
   curl -L --silent -o "$PIPER_JSON" "${BASE_URL}/fr_FR-upmc-medium.onnx.json"
 fi
 
-echo "[6/6] Download livekit-server"
+# `uname -s` est conserve ici : le manifeste ci-dessous s en sert pour son champ
+# `platform`. Il etait defini dans l etape de telechargement de livekit-server,
+# retiree avec le reste du pipeline LiveKit.
 OS="$(uname -s)"
-ARCH="$(uname -m)"
-LK_TARGET="$BIN_DIR/livekit-server"
-if [[ ! -x "$LK_TARGET" ]]; then
-  RELEASE_JSON="$(curl -fsSL -H "User-Agent: crush-bundle" "https://api.github.com/repos/livekit/livekit/releases/latest")"
-  case "$OS" in
-    Darwin)
-      if [[ "$ARCH" == "arm64" ]]; then
-        PATTERN='livekit_.*_darwin_arm64\.tar\.gz'
-      else
-        PATTERN='livekit_.*_darwin_amd64\.tar\.gz'
-      fi
-      ;;
-    Linux)
-      if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-        PATTERN='livekit_.*_linux_arm64\.tar\.gz'
-      else
-        PATTERN='livekit_.*_linux_amd64\.tar\.gz'
-      fi
-      ;;
-    *)
-      echo "Unsupported OS for bundled livekit-server"
-      PATTERN=""
-      ;;
-  esac
-  if [[ -n "$PATTERN" ]]; then
-    URL="$(python3 -c "import json,re,sys; r=json.load(sys.stdin); a=next(x for x in r['assets'] if re.search(sys.argv[1], x['name'])); print(a['browser_download_url'])" "$PATTERN" <<< "$RELEASE_JSON")"
-    TMP_ARCHIVE="$(mktemp)"
-    curl -fL --retry 3 -o "$TMP_ARCHIVE" "$URL"
-    EXTRACT_DIR="$(mktemp -d)"
-    tar -xzf "$TMP_ARCHIVE" -C "$EXTRACT_DIR"
-    EXTRACTED="$(find "$EXTRACT_DIR" -name 'livekit-server' -type f | head -n 1)"
-    if [[ -z "$EXTRACTED" ]]; then
-      echo "livekit-server binary not found in archive"
-      exit 1
-    fi
-    cp "$EXTRACTED" "$LK_TARGET"
-    chmod +x "$LK_TARGET"
-    rm -f "$TMP_ARCHIVE"
-    rm -rf "$EXTRACT_DIR"
-  fi
-fi
 
 echo "Write manifest"
 cat > "$BUNDLE_ROOT/manifest.json" <<EOF
@@ -142,8 +103,7 @@ cat > "$BUNDLE_ROOT/manifest.json" <<EOF
     "piper_json": "models/piper/fr_FR-upmc-medium.onnx.json"
   },
   "bin": {
-    "uv": "bin/uv",
-    "livekit": "bin/livekit-server"
+    "uv": "bin/uv"
   }
 }
 EOF

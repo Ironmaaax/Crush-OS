@@ -4,7 +4,7 @@ FROM python:3.11-slim
 
 # Deps système du cœur, à l'exécution uniquement — aucune compilation.
 #
-#   libportaudio2  `sounddevice` est une dépendance dure de livekit-agents.
+#   libportaudio2  `sounddevice` appartient a l extra `local-audio`.
 #                  C'est un wrapper ctypes : il lui faut la lib PortAudio
 #                  présente, même si on n'ouvre jamais de flux audio (sur un
 #                  serveur headless, le micro est celui du navigateur client).
@@ -54,9 +54,7 @@ RUN mkdir -p memory_data/sessions \
 
 EXPOSE 8000
 
-# API + voice agent (LiveKit Cloud, pas de serveur LiveKit local lancé ici —
-# cf. décision : crush run lance livekit-server --dev inconditionnellement,
-# on ne veut pas ça puisqu'on utilise LiveKit Cloud)
+# API seule : le pipeline vocal vit dans l API, sur /ws/voice.
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

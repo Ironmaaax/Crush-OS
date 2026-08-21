@@ -7,7 +7,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![LiveKit](https://img.shields.io/badge/LiveKit-voice-F5A623?style=flat-square)](https://livekit.io)
+[![WebSocket](https://img.shields.io/badge/WebSocket-voice-F5A623?style=flat-square)](https://developer.mozilla.org/fr/docs/Web/API/WebSockets_API)
 [![Claude](https://img.shields.io/badge/Claude-Anthropic-8B5CF6?style=flat-square)](https://anthropic.com)
 ![CRUSH-OS](CRUSHINTERFACEGITHUB.png)
 
@@ -17,11 +17,11 @@
 
 ## C'est quoi ?
 
-Crush est un assistant personnel IA qui tourne en local. Il expose un serveur FastAPI qui gère à la fois une interface de chat texte et un pipeline vocal temps réel (via LiveKit). Il se connecte au LLM de ton choix, mémorise les conversations, utilise des outils (recherche web, Gmail, Google Calendar, Spotify, vision, exécution de code…) et fait tourner des tâches proactives en arrière-plan (alertes météo, digests d'actualités, etc.).
+Crush est un assistant personnel IA qui tourne en local. Il expose un serveur FastAPI qui gère à la fois une interface de chat texte et un pipeline vocal temps réel (le navigateur pousse son micro sur `/ws/voice`). Il se connecte au LLM de ton choix, mémorise les conversations, utilise des outils (recherche web, Gmail, Google Calendar, Spotify, vision, exécution de code…) et fait tourner des tâches proactives en arrière-plan (alertes météo, digests d'actualités, etc.).
 
 **Fonctionnalités principales :**
 
-- Pipeline vocal temps réel : STT (Whisper/Deepgram) + LLM + TTS (Piper/ElevenLabs), bridgé via LiveKit
+- Pipeline vocal temps réel : STT (Whisper/Deepgram) + LLM + TTS (Piper/ElevenLabs), sur un WebSocket direct — pas de serveur média
 - Mémoire vivante (Memory Kernel) : faits atomiques datés, sourcés, renforçables, oubliables, corrigeables ; SQLite source de vérité, miroir Markdown lisible
 - Mission Engine : transforme une demande en mission planifiée, vérifiée à chaque étape (structurelle, déterministe, sémantique), reprise après crash
 - Gouvernance transversale : tout ce qui touche au filesystem ou au réseau passe par un gate composite (risque × catégorie × budget) avec audit immuable
@@ -49,7 +49,7 @@ règle est exécutable, pas juste de la convention.
 | **L1** | `capabilities/` | Tools (browser, Gmail, Calendar, Notion, Spotify, vision, filesystem, CLI, memory…), Skills (`registry.py`, `lifecycle.py`, `lab.py`, `synthesizer.py`, `executor.py`) |
 | **L1** | `analytics/`, `hardware/` | Widgets analytics (YouTube, projets, etc.), Macropad 2 touches, parsers Bluetooth |
 | **L2** | `engine/` | Gateway, Agent, Router, SessionManager (composition orchestrale), BudgetGuard, UsageTracker, Mission Engine (`mission/orchestrator.py`, `worker_agent.py`, `verifier.py`, `governance.py`, `reflexion.py`, `capability_engine.py`), Proactif (`proactive/engine.py`, `command_center.py`, `curator.py`, collectors), Background (`background/worker.py`, `scheduler.py`, `notifications.py`) |
-| **L3** | `interfaces/`, `app.py`, `bootstrap.py` | `bootstrap.build()` = composition root unique (instancie ~30 objets, câble le bus, vérifie isinstance Protocols), `app.py` (point d'entrée API), `interfaces/api/*.py` (routers FastAPI : chat, budget, memory, proactive, skills, config/{settings,llm,devices,permissions}, sessions, vision, system, …), `interfaces/voice/agent.py` (pipeline voix LiveKit) |
+| **L3** | `interfaces/`, `app.py`, `bootstrap.py` | `bootstrap.build()` = composition root unique (instancie ~30 objets, câble le bus, vérifie isinstance Protocols), `app.py` (point d'entrée API), `interfaces/api/*.py` (routers FastAPI : chat, budget, memory, proactive, skills, config/{settings,llm,devices,permissions}, sessions, vision, system, …), `interfaces/api/voice_ws.py` (pipeline voix sur WebSocket) |
 
 **Garde-fous permanents** (CI lane rapide, à chaque push) :
 
@@ -73,7 +73,7 @@ Deux profils distincts :
 
 ### Utilisateur final (Windows)
 
-Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle/`** : l'assistant web le télécharge pour toi en un clic (~650 Mo). Tu n'as **pas** besoin d'installer Python, uv, cmake, Visual C++ ni LiveKit sur ta machine, ni d'extraire manuellement une archive offline.
+Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle/`** : l'assistant web le télécharge pour toi en un clic (~650 Mo). Tu n'as **pas** besoin d'installer Python, uv, cmake ni Visual C++ sur ta machine, ni d'extraire manuellement une archive offline.
 
 | Requis | Notes |
 |---|---|
@@ -83,7 +83,7 @@ Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle
 | Connexion internet | Uniquement pour le premier téléchargement du bundle (étape 1 du setup) |
 | Clés API (LLM, etc.) | OpenAI ou Anthropic au minimum, saisies dans l'assistant web |
 
-Le bundle embarque : un Python 3.11 **autonome et relocalisable** (`bundle/python`), un environnement virtuel (`bundle/.venv`), les dépendances Python, les modèles ML (YOLO, Piper), `livekit-server` et `uv.exe`. Au premier `setup`, l'environnement est automatiquement ré-ancré sur la machine cible (aucun chemin absolu de la machine de build n'est requis).
+Le bundle embarque : un Python 3.11 **autonome et relocalisable** (`bundle/python`), un environnement virtuel (`bundle/.venv`), les dépendances Python, les modèles ML (YOLO, Piper) et `uv.exe`. Au premier `setup`, l'environnement est automatiquement ré-ancré sur la machine cible (aucun chemin absolu de la machine de build n'est requis).
 
 > **Release offline pré-construite** : si ton archive contient déjà `bundle/`, le bouton Télécharger n'apparaît pas — tu passes directement à la configuration.
 
@@ -96,13 +96,13 @@ Une seule fois, **avec réseau**, pour produire `bundle/` (release ou usage loca
 | [uv](https://docs.astral.sh/uv/) | latest | Télécharge un Python 3.11 relocalisable dans `bundle/python` + venv `bundle/.venv` |
 | Réseau | | Téléchargement des deps, modèles et binaires |
 
-Python système et LiveKit **ne sont pas requis** : le script de build les intègre au bundle.
+Python système **n'est pas requis** : le script de build l'intègre au bundle.
 
 ### Modules optionnels (hors install de base)
 
 | Outil | Notes |
 |---|---|
-| [LiveKit Cloud](https://livekit.io/) | Alternative au serveur local (déjà dans le bundle) |
+| [Docker](https://docs.docker.com/) | Code-agent, bac à sable du Skill Lab |
 | Docker | Code-agent, Skill Lab sandbox |
 | `uv sync --extra vision` | Détection d'objets YOLOv8 + OpenCV. **Déjà inclus dans le bundle Windows**, à installer seulement pour un parcours de développement |
 | `uv sync --extra face` | Reconnaissance faciale — `dlib` compile depuis les sources ; sur Windows, peut exiger [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (workload C++) |
@@ -143,11 +143,11 @@ L'assistant web configure l'identité, les clés API, les modules optionnels et 
 | Commande | Rôle |
 |---|---|
 | `.\crush.ps1 setup` | Assistant de configuration (`:8765`) — téléchargement bundle intégré |
-| `.\crush.ps1 run` | LiveKit + API + pipeline vocal |
+| `.\crush.ps1 run` | API — chat et vocal, le vocal étant servi sur `/ws/voice` |
 | `.\crush.ps1 api` | Serveur FastAPI seul |
 | `.\crush.ps1 doctor` | Diagnostic rapide |
 
-Les logs des runs sont dans `%TEMP%\crush` (`livekit.log`, `api.log`, `voice.log`). `.\crush.ps1 run` tue les process résiduels puis réinitialise ces trois fichiers à chaque démarrage.
+Le log du run est dans `%TEMP%\crushpi.log`. `.\crush.ps1 run` tue les process résiduels puis réinitialise ce fichier à chaque démarrage.
 
 ### Parcours B : Construire le bundle (développeur)
 
@@ -171,7 +171,7 @@ bash scripts/release/build_bundle.sh
 ./crush eclosion
 ```
 
-Le script crée `bundle/` : `.venv`, modèles, `livekit-server`, `manifest.json`. Ensuite, la configuration et le démarrage suivent le même flux que le parcours A (sans nouveau téléchargement).
+Le script crée `bundle/` : `.venv`, modèles, `manifest.json`. Ensuite, la configuration et le démarrage suivent le même flux que le parcours A (sans nouveau téléchargement).
 
 ### Parcours C : Développement sans bundle (Linux / macOS / Windows)
 
@@ -239,9 +239,9 @@ Tout est configuré via l'assistant web (`.\crush.ps1 setup` ou `./crush eclosio
 | `mistral` | `MISTRAL_API_KEY` | Function calling supporté. |
 | `local` (`LLM_PROVIDER=local`) | aucune | Ollama local. |
 
-Le backend choisi pilote le chat texte et les tâches background (mémoire, consolidation, auto-dream) ; aucune dépendance Anthropic n'est forcée si `API_BACKEND` n'est pas `anthropic`. La voix est gérée par le pipeline LiveKit temps réel (ci-dessous).
+Le backend choisi pilote le chat texte et les tâches background (mémoire, consolidation, auto-dream) ; aucune dépendance Anthropic n'est forcée si `API_BACKEND` n'est pas `anthropic`. La voix suit le même backend (ci-dessous).
 
-**Pipeline vocal LiveKit temps réel :** c'est un process séparé (`crush.interfaces.voice.agent`) qui utilise les plugins LLM de LiveKit. Il suit `API_BACKEND` (OpenAI / Anthropic / Mistral). Si le backend n'est pas géré côté LiveKit, il bascule sur Gemini (`GOOGLE_API_KEY` requis). Surcharge possible via `VOICE_LLM_MODEL`.
+**Pipeline vocal temps réel :** il vit **dans l'API**. Le navigateur publie son micro sur `/ws/voice` ; l'API transcrit (`providers/audio/stt.py`), répond via le Gateway et renvoie l'audio (`providers/audio/tts.py`). Aucun serveur média, aucun périphérique audio requis côté serveur. Surcharge du modèle possible via `VOICE_LLM_MODEL`.
 
 **Intégrations Google (Gmail / Calendar) :** place ton `credentials.json` issu de Google Cloud Console dans `config/google_credentials.json`, puis démarre Crush, il ouvrira le flux d'authentification OAuth et sauvegardera les tokens en local (ils sont gitignorés).
 
@@ -398,7 +398,7 @@ documentés en [`docs/migration/BACKLOG.md`](docs/migration/BACKLOG.md).
 
 - **Python 3.11** : async / FastAPI / uvicorn
 - **LLM au choix** via `API_BACKEND` : Anthropic Claude, OpenAI, Mistral, ou Ollama en local (une seule clé requise)
-- **LiveKit Agents** : pipeline vocal temps réel
+- **WebSocket** : pipeline vocal temps réel, intégré à l'API
 - **Deepgram** : STT cloud / **faster-whisper** : STT local
 - **Piper** : TTS local / **ElevenLabs** : TTS cloud
 - **YOLOv8** (ultralytics) : détection d'objets pour l'outil vision

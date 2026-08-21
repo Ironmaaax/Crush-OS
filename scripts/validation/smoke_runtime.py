@@ -37,7 +37,7 @@ Modes :
                         soit le process (le bootstrap diffère uniquement
                         sur le câblage voice/agent). Le smoke teste API.
                         Voice = à compléter quand le voice loop sera
-                        runnable hors-LiveKit.
+                        couvert : il vit desormais dans l API.
 
 Mortalité prouvée : casser le wiring d'un provider dans bootstrap (ex.
 remplacer `llm` par `None`, ou commenter `bus.subscribe(...)`) fait
@@ -211,7 +211,7 @@ def main() -> None:
         _exit(
             0,
             "SKIP : --process=voice non implémenté en F MVP ; "
-            "le voice loop dépend de LiveKit en runtime — à reprendre en G.",
+            "le pipeline vocal vit maintenant dans l API : --process=api le couvre.",
         )
 
     # Bootstrap : on construit avec un memory_dir temporaire pour isoler le

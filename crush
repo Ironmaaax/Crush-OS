@@ -9,16 +9,7 @@ cd "$(dirname "$_SCRIPT")"
 case "${1:-}" in
   eclosion) bash setup.sh ;;
   api)      uv run python -m crush.app ;;
-  voice)    uv run python -m crush.interfaces.voice.agent dev ;;
-  livekit)
-    bash scripts/ensure_livekit.sh
-    livekit-server --dev --node-ip 127.0.0.1 --keys "devkey: devsecretdevsecretdevsecretdevsecret" ;;
   run|start)
-    # Auto-provision : installe livekit-server s'il manque (no-op s'il est déjà là).
-    bash scripts/ensure_livekit.sh || {
-      printf "\n  \033[91m●\033[0m  LiveKit indisponible — voir les instructions ci-dessus.\n\n"
-      exit 1
-    }
     exec /usr/bin/env bash --noprofile --norc -c '
       # ── Styles ────────────────────────────────────────────────────
       R="\033[0m"; B="\033[1m"
@@ -51,17 +42,14 @@ case "${1:-}" in
         printf "  ${WH}→${R} ${GY}clique sur le micro pour le mode vocal${R}\n"
         printf "  ${WH}→${R} ${GY}Ctrl-C pour arrêter${R}\n"
         printf "  ${DG}─────────────────────────────────────────────${R}\n"
-        printf "  ${DG}Logs détaillés : /tmp/crush/{livekit,api,voice}.log${R}\n"
+        printf "  ${DG}Log détaillés : /tmp/crush/api.log${R}\n"
         printf "\n"
       }
 
       _header
 
       # ── Cleanup ports + anciens process ──────────────────────────
-      pkill -f "livekit-server" 2>/dev/null || true
-      pkill -f "crush.interfaces.voice.agent" 2>/dev/null || true
-      pkill -f "voice_agent.py" 2>/dev/null || true  # legacy shim, à retirer post-refonte
-      for _p in 7880 7881 8000; do
+      for _p in 8000; do
         _pid=$(lsof -nP -iTCP:$_p -sTCP:LISTEN -t 2>/dev/null || true)
         [ -n "$_pid" ] && kill -9 $_pid 2>/dev/null || true
       done
@@ -96,25 +84,8 @@ case "${1:-}" in
       }
 
       mkdir -p /tmp/crush
-      LK_LOG=/tmp/crush/livekit.log
       API_LOG=/tmp/crush/api.log
-      VOICE_LOG=/tmp/crush/voice.log
-      : > "$LK_LOG"; : > "$API_LOG"; : > "$VOICE_LOG"
-
-      # 1) LiveKit
-      _row_wait "LiveKit" "démarrage..."
-      livekit-server --dev --node-ip 127.0.0.1 \
-        --keys "devkey: devsecretdevsecretdevsecretdevsecret" > "$LK_LOG" 2>&1 &
-      _pids+=($!)
-      if _wait_http "http://127.0.0.1:7880/" 40; then
-        printf "$CLEAR_LINE"; _row_ok "LiveKit" "ws://localhost:7880"
-      else
-        printf "$CLEAR_LINE"; _row_err "LiveKit" "le serveur LiveKit n a pas demarre"
-        printf "  ${DG}--- dernieres lignes de %s ---${R}\n" "$LK_LOG"
-        tail -n 15 "$LK_LOG" 2>/dev/null | sed "s/^/  /"
-        printf "  ${DG}Causes frequentes : port 7880 occupe, ou livekit-server absent (crush livekit).${R}\n\n"
-        exit 1
-      fi
+      : > "$API_LOG"
 
       # Préflight : vérifie l environnement (deps natives, .env, port) et explique
       # clairement tout probleme AVANT de tenter de lancer l API (evite le timeout opaque).
@@ -139,23 +110,11 @@ case "${1:-}" in
       fi
 
       # 3) Voice worker (prewarm = ~10s pour charger Silero VAD + plugins)
-      _row_wait "Vocal" "préchauffement (~10s)..."
-      PYTHONWARNINGS=ignore uv run python -m crush.interfaces.voice.agent dev --log-level info > "$VOICE_LOG" 2>&1 &
-      _pids+=($!)
-      if _wait_grep "$VOICE_LOG" "Crush vocal prêt" 90; then
-        printf "$CLEAR_LINE"; _row_ok "Vocal" "prêt"
-      else
-        printf "$CLEAR_LINE"; _row_err "Vocal" "préchauffement long ou échec"
-        printf "  ${DG}--- dernieres lignes de %s ---${R}\n" "$VOICE_LOG"
-        tail -n 10 "$VOICE_LOG" 2>/dev/null | sed "s/^/  /"
-        printf "\n"
-      fi
-
       _banner
 
-      # Stream live filtré : on garde lessentiel (loguru INFO/WARN/ERROR
-      # de main.py, événements voice agent) et on coupe le bruit.
-      tail -F -n 0 "$VOICE_LOG" "$API_LOG" 2>/dev/null \
+      # Stream live filtre : on garde l essentiel (loguru INFO/WARN/ERROR de
+      # main.py) et on coupe le bruit.
+      tail -F -n 0 "$API_LOG" 2>/dev/null \
         | grep --line-buffered -vE \
             "objc\[|pkg_resources|Using selector|Watching|plugin registered|HTTP server listening|starting worker|registered worker|^[[:space:]]*$" &
       _pids+=($!)
@@ -228,16 +187,6 @@ def check_deepgram():
         return ("ok", "Nova-2") if s == 200 else ("error", f"HTTP {s}")
     except: return ("error", "Inaccessible")
 
-def check_livekit():
-    import shutil
-    if not shutil.which("livekit-server"):
-        return ("warning", "binaire absent · 'crush run' l'installe auto")
-    try:
-        http_get("http://localhost:7880/")
-        return ("ok", "installe · serveur en ligne")
-    except:
-        return ("ok", "installe · serveur eteint")
-
 def check_mapbox():
     t = e("MAPBOX_TOKEN")
     return ("ok", "Token present") if t else ("warning", "MAPBOX_TOKEN manquante")
@@ -271,7 +220,6 @@ CHECKS = [
     ("anthropic",  "Anthropic",       check_anthropic),
     ("elevenlabs", "ElevenLabs",      check_elevenlabs),
     ("deepgram",   "Deepgram",        check_deepgram),
-    ("livekit",    "LiveKit",         check_livekit),
     ("mapbox",     "Mapbox",          check_mapbox),
     ("docker",     "Docker",          check_docker),
     ("memory",     "Memoire",         check_memory),
@@ -330,10 +278,8 @@ PYEOF
     echo ""
     echo "  Usage : crush <commande>"
     echo ""
-    echo "    run        —  démarre tout (LiveKit + API + Voice)"
+    echo "    run        —  démarre tout (chat + vocal sur /ws/voice)"
     echo "    api        —  démarre le serveur FastAPI uniquement"
-    echo "    voice      —  démarre le pipeline vocal uniquement"
-    echo "    livekit    —  démarre le serveur LiveKit local"
     echo "    eclosion   —  installation et configuration"
     echo "    doctor     —  diagnostic des composants"
     echo ""

@@ -14,9 +14,8 @@
 #   2. installe les paquets système du cœur (aucune compilation) ;
 #   3. installe uv, puis synchronise les dépendances Python (cœur seul) ;
 #   4. génère un jeton d'accès et active l'authentification si besoin ;
-#   5. installe livekit-server si le pipeline vocal est local ;
-#   6. installe et active les unités systemd ;
-#   7. affiche la marche à suivre pour l'accès HTTPS via Tailscale.
+#   5. installe et active les unités systemd ;
+#   6. affiche la marche à suivre pour l'accès HTTPS via Tailscale.
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -55,7 +54,7 @@ fi
 # ── 2. Paquets système ────────────────────────────────────────────────────────
 step "Paquets système"
 
-# libportaudio2 : `sounddevice` est une dépendance dure de livekit-agents. Le
+# libportaudio2 : `sounddevice` appartient a l'extra `local-audio`. Le
 # module est chargé même sans micro sur la machine ; sans la bibliothèque, il
 # lève OSError à l'import. On installe donc la lib d'exécution (quelques
 # centaines de Ko), PAS portaudio19-dev qui n'apporte que les en-têtes de
@@ -127,10 +126,9 @@ set_env() {
 
 current_env() {
   # `tr -d '\r'` n'est pas cosmétique : un .env copié depuis Windows arrive en
-  # CRLF, et `LIVEKIT_URL=` y vaut "\r" — non vide. Sans ce filtre, le test
-  # `-z` échoue et l'installateur conclut à tort à un LiveKit distant, donc
-  # n'installe pas le serveur local et laisse le service vocal en boucle
-  # d'échec. Constaté au premier déploiement réel sur le Pi.
+  # CRLF, et une valeur vide y vaut "\r" — donc NON vide pour un test `-z`.
+  # Un PORT ou un API_TOKEN lu ainsi produit une configuration silencieusement
+  # fausse. Constaté au premier déploiement réel sur le Pi.
   grep "^${1}=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' || true
 }
 
@@ -168,26 +166,7 @@ PORT="$(current_env PORT)"; PORT="${PORT:-8000}"
 chmod 600 "$ENV_FILE"
 ok "Permissions de .env restreintes au propriétaire"
 
-# ── 5. LiveKit ────────────────────────────────────────────────────────────────
-step "Pipeline vocal"
-
-LIVEKIT_URL="$(current_env LIVEKIT_URL)"
-LIVEKIT_IS_LOCAL=false
-if [ -z "$LIVEKIT_URL" ] || printf '%s' "$LIVEKIT_URL" | grep -qE '127\.0\.0\.1|localhost'; then
-  LIVEKIT_IS_LOCAL=true
-fi
-
-if [ "$LIVEKIT_IS_LOCAL" = true ]; then
-  if ! command -v livekit-server >/dev/null 2>&1; then
-    printf "  Installation de livekit-server…\n"
-    bash "$PROJECT_DIR/scripts/ensure_livekit.sh" || warn "Installation de livekit-server échouée — la voix restera indisponible."
-  fi
-  command -v livekit-server >/dev/null 2>&1 && ok "livekit-server local" || warn "livekit-server absent"
-else
-  ok "LiveKit distant configuré ($LIVEKIT_URL) — pas de serveur local"
-fi
-
-# ── 6. Services systemd ───────────────────────────────────────────────────────
+# ── 5. Services systemd ───────────────────────────────────────────────────────
 step "Services systemd"
 
 install_unit() {
@@ -199,19 +178,16 @@ install_unit() {
 }
 
 install_unit crush-api.service
-install_unit crush-voice.service
-[ "$LIVEKIT_IS_LOCAL" = true ] && install_unit crush-livekit.service
 
 sudo systemctl daemon-reload
 
-ENABLED_UNITS=(crush-api.service crush-voice.service)
-[ "$LIVEKIT_IS_LOCAL" = true ] && ENABLED_UNITS=(crush-livekit.service "${ENABLED_UNITS[@]}")
+ENABLED_UNITS=(crush-api.service)
 
 sudo systemctl enable "${ENABLED_UNITS[@]}" >/dev/null 2>&1
 sudo systemctl restart "${ENABLED_UNITS[@]}"
 ok "Services activés au démarrage et lancés"
 
-# ── 7. Accès réseau ───────────────────────────────────────────────────────────
+# ── 6. Accès réseau ───────────────────────────────────────────────────────────
 step "Accès depuis le téléphone et le PC"
 
 TS_HOST=""

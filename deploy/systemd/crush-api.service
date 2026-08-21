@@ -31,7 +31,7 @@ WorkingDirectory=__CRUSH_DIR__
 # pas encore prêt et retarde le démarrage de plusieurs secondes.
 ExecStart=__CRUSH_DIR__/.venv/bin/python -m crush.app
 
-# Le binaire livekit-server est posé dans /usr/local/bin par get.livekit.io.
+# /usr/local/bin reste dans le PATH : les binaires installés à la main y vivent.
 Environment=PATH=__CRUSH_DIR__/.venv/bin:/usr/local/bin:/usr/bin:/bin
 # Sorties non tamponnées : sans ça, journalctl n'affiche les logs que par
 # blocs de 8 Ko, ce qui rend le suivi en direct inutilisable.

@@ -43,11 +43,6 @@
     "ElevenLabs":         { kind: "key",   keys: [{ key: "ELEVENLABS_API_KEY",   label: "Clé API ElevenLabs",  secret: true }] },
     "OpenAI":             { kind: "key",   keys: [{ key: "OPENAI_API_KEY",       label: "Clé API OpenAI",      secret: true }] },
     "Google (API Key)":   { kind: "key",   keys: [{ key: "GOOGLE_API_KEY",       label: "Clé API Google",      secret: true }] },
-    "LiveKit":            { kind: "key",   keys: [
-      { key: "LIVEKIT_URL",        label: "URL",        secret: false },
-      { key: "LIVEKIT_API_KEY",    label: "API Key",    secret: true },
-      { key: "LIVEKIT_API_SECRET", label: "API Secret", secret: true },
-    ]},
     "Deepgram":           { kind: "key",   keys: [{ key: "DEEPGRAM_API_KEY",     label: "Clé API Deepgram",    secret: true }] },
     "Mistral":            { kind: "key",   keys: [{ key: "MISTRAL_API_KEY",      label: "Clé API Mistral",     secret: true }] },
     // ── Messagerie ───────────────────────────────────────────────────────────

@@ -101,21 +101,6 @@ def test_resolve_uv_uses_bundled_binary(fake_bundle: Path) -> None:
     assert bundle.resolve_uv() == str(bundled)
 
 
-def test_resolve_livekit_binary_none_when_absent(fake_bundle: Path) -> None:
-    assert bundle.resolve_livekit_binary() is None
-
-
-def test_resolve_livekit_binary_from_manifest(fake_bundle: Path) -> None:
-    rel = "bin/livekit-server.exe" if sys.platform == "win32" else "bin/livekit-server"
-    target = fake_bundle / rel
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("", encoding="utf-8")
-    (fake_bundle / "manifest.json").write_text(
-        json.dumps({"bin": {"livekit": rel}}), encoding="utf-8"
-    )
-    assert bundle.resolve_livekit_binary() == target
-
-
 def test_prerequisites_status_shape(fake_bundle: Path) -> None:
     (fake_bundle / "manifest.json").write_text(
         json.dumps({"version": "9"}), encoding="utf-8"
@@ -129,7 +114,7 @@ def test_prerequisites_status_shape(fake_bundle: Path) -> None:
     assert status["yolo_model"] is False
     assert status["piper_model"] is False
     assert status["offline_ready"] is False
-    for key in ("platform", "python_path", "livekit_binary", "livekit_path"):
+    for key in ("platform", "python_path"):
         assert key in status
     assert "bundle_inspection" in status
     assert status["bundle_inspection"]["valid"] is True

@@ -48,10 +48,6 @@
     elevenlabs_api_key: "",
     elevenlabs_voice_id: "",
     voice_enabled: false,
-    livekit_cloud: false,
-    livekit_url: "",
-    livekit_api_key: "",
-    livekit_api_secret: "",
     deepgram_api_key: "",
     aisstream_key: "",
     face_recognition_enabled: false,
@@ -504,17 +500,6 @@
       ],
     ));
 
-    const lk = prereq.livekit_detail || {};
-    list.appendChild(statusRowDetailed(
-      "LiveKit local",
-      !!prereq.livekit_binary,
-      prereq.livekit_binary ? "prêt" : "optionnel",
-      [
-        lk.project_path ? "Projet · bin/" + lk.project_path.split("/").slice(-1)[0] : null,
-        lk.bundle_path ? "Bundle · " + lk.bundle_path.split("/").slice(-2).join("/") : null,
-        !prereq.livekit_binary ? "Requis uniquement pour le pipeline vocal local" : null,
-      ],
-    ));
     card.appendChild(list);
     if (!prereq.bundle && !bundleDownloading) {
       if (bundleInfo.downloadable) {
@@ -602,25 +587,13 @@
         "Piper est inclus dans le bundle offline — aucune clé requise pour la synthèse vocale locale.",
       ));
     }
-    card.appendChild(checkbox("Activer le pipeline vocal LiveKit", "voice_enabled"));
+    card.appendChild(checkbox("Activer le pipeline vocal", "voice_enabled"));
     if (form.voice_enabled) {
-      card.appendChild(checkbox("Utiliser LiveKit Cloud (sinon serveur local)", "livekit_cloud"));
       card.appendChild(secretField("Clé Deepgram (STT)", "deepgram_api_key"));
       card.appendChild(moduleHint(
-        "Deepgram : console.deepgram.com → API Keys → DEEPGRAM_API_KEY dans .env.",
+        "Deepgram : console.deepgram.com → API Keys → DEEPGRAM_API_KEY dans .env. "
+        + "Le navigateur publie son micro sur /ws/voice : aucun serveur média requis.",
       ));
-      if (form.livekit_cloud) {
-        card.appendChild(field("LiveKit URL", "livekit_url", { placeholder: "wss://…" }));
-        card.appendChild(secretField("LiveKit API Key", "livekit_api_key"));
-        card.appendChild(secretField("LiveKit API Secret", "livekit_api_secret"));
-        card.appendChild(moduleHint(
-          "LiveKit Cloud : livekit.io → ton projet → Settings → URL wss://, API Key et Secret dans .env.",
-        ));
-      } else {
-        card.appendChild(moduleHint(
-          "Serveur local : inclus dans le bundle Windows. Lance .\\crush.ps1 run — LiveKit démarre sur ws://localhost:7880.",
-        ));
-      }
     } else {
       card.appendChild(moduleHint(
         "Chat texte fonctionne sans voix. Pour activer plus tard : DEEPGRAM_API_KEY + .\\crush.ps1 run.",
@@ -696,11 +669,9 @@
       if (cfg.ollama_model) form.ollama_model = cfg.ollama_model;
       if (cfg.ollama_base_url) form.ollama_base_url = cfg.ollama_base_url;
       if (cfg.elevenlabs_voice_id) form.elevenlabs_voice_id = cfg.elevenlabs_voice_id;
-      if (cfg.livekit_url) form.livekit_url = cfg.livekit_url;
       form.elevenlabs_enabled = !!cfg.elevenlabs_enabled;
       form.tts_provider = cfg.elevenlabs_enabled ? "elevenlabs" : "piper";
       form.voice_enabled = !!cfg.voice_enabled;
-      form.livekit_cloud = !!cfg.livekit_cloud;
       form.aisstream_enabled = !!cfg.aisstream_enabled;
       form.face_recognition_enabled = !!cfg.face_recognition_enabled;
       if (cachedStatus.complete && step < STEPS.length - 1) {
@@ -756,14 +727,6 @@
     if (form.voice_enabled) {
       const hasDeepgram = form.deepgram_api_key.trim() || secretsSet.deepgram_api_key;
       if (!hasDeepgram) return "Clé Deepgram requise pour le pipeline vocal.";
-      if (form.livekit_cloud) {
-        const hasLkUrl = form.livekit_url.trim();
-        const hasLkKey = form.livekit_api_key.trim() || secretsSet.livekit_api_key;
-        const hasLkSecret = form.livekit_api_secret.trim() || secretsSet.livekit_api_secret;
-        if (!hasLkUrl || !hasLkKey || !hasLkSecret) {
-          return "URL et clés LiveKit Cloud requises.";
-        }
-      }
     }
     return null;
   }
@@ -814,10 +777,6 @@
         elevenlabs_api_key: form.elevenlabs_api_key,
         elevenlabs_voice_id: form.elevenlabs_voice_id,
         voice_enabled: form.voice_enabled,
-        livekit_cloud: form.livekit_cloud,
-        livekit_url: form.livekit_url,
-        livekit_api_key: form.livekit_api_key,
-        livekit_api_secret: form.livekit_api_secret,
         deepgram_api_key: form.deepgram_api_key,
         aisstream_key: form.aisstream_key,
         face_recognition_enabled: form.face_recognition_enabled,

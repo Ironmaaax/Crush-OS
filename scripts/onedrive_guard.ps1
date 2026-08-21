@@ -57,7 +57,6 @@ function Stop-CrushInstallProcesses {
         [Parameter(Mandatory = $true)]
         [string]$ProjectRoot
     )
-    Stop-Process -Name "livekit-server" -Force -ErrorAction SilentlyContinue
 
     $rootPattern = [regex]::Escape([System.IO.Path]::GetFullPath($ProjectRoot))
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {

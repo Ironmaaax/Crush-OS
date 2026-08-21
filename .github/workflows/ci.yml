@@ -62,7 +62,7 @@ jobs:
 
       - name: Unit tests (sans deps lourdes ni intégration)
         # `pytest -m "not integration"` — les tests qui ont besoin de deps
-        # lourdes (livekit, sounddevice, opencv chargé en bg) sont marqués
+        # lourdes (sounddevice, opencv chargé en bg) sont marqués
         # `@pytest.mark.integration` et exclus ici.
         #
         # Chaque échec est aussi émis en `::error::` : les annotations d'un run

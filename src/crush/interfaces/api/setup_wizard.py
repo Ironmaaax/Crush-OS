@@ -47,10 +47,6 @@ class SetupCompletePayload(BaseModel):
     elevenlabs_voice_id: str = ""
     elevenlabs_model: str = "eleven_flash_v2_5"
     voice_enabled: bool = False
-    livekit_cloud: bool = False
-    livekit_url: str = ""
-    livekit_api_key: str = ""
-    livekit_api_secret: str = ""
     deepgram_api_key: str = ""
     aisstream_key: str = ""
     face_recognition_enabled: bool = False
@@ -76,7 +72,6 @@ async def setup_status() -> dict:
     def _has(key: str) -> bool:
         return bool(env.get(key, "").strip())
 
-    livekit_url = env.get("LIVEKIT_URL", "")
     # Backend effectif : « local » si Ollama, sinon le backend API configuré.
     is_local = env.get("LLM_PROVIDER", "api") == "local"
     effective_backend = "local" if is_local else env.get("API_BACKEND", "anthropic")
@@ -99,8 +94,6 @@ async def setup_status() -> dict:
             "elevenlabs_enabled": env.get("TTS_PROVIDER", "") == "elevenlabs",
             "elevenlabs_voice_id": env.get("ELEVENLABS_VOICE_ID", ""),
             "voice_enabled": _has("DEEPGRAM_API_KEY"),
-            "livekit_cloud": livekit_url.startswith("wss://"),
-            "livekit_url": livekit_url if livekit_url.startswith("wss://") else "",
             "face_recognition_enabled": env.get("FACE_RECOGNITION_ENABLED", "false") == "true",
         },
         # Présence des secrets (jamais leur valeur) — pour afficher "déjà configuré".
@@ -111,8 +104,6 @@ async def setup_status() -> dict:
             "gemini_api_key": _has("GEMINI_API_KEY"),
             "elevenlabs_api_key": _has("ELEVENLABS_API_KEY"),
             "deepgram_api_key": _has("DEEPGRAM_API_KEY"),
-            "livekit_api_key": _has("LIVEKIT_API_KEY"),
-            "livekit_api_secret": _has("LIVEKIT_API_SECRET"),
         },
     }
 
@@ -172,25 +163,12 @@ async def setup_complete(body: SetupCompletePayload) -> dict:
     staged = stage_models_from_bundle()
 
     port = body.port or _find_available_port()
-    livekit_url = ""
-    livekit_api_key = ""
-    livekit_api_secret = ""
     deepgram_api_key = ""
 
     if body.voice_enabled:
         deepgram_api_key = _secret(body.deepgram_api_key, "DEEPGRAM_API_KEY")
         if not deepgram_api_key:
             raise HTTPException(400, "Cle Deepgram requise pour le pipeline vocal.")
-        if body.livekit_cloud:
-            livekit_url = body.livekit_url.strip() or existing.get("LIVEKIT_URL", "")
-            livekit_api_key = _secret(body.livekit_api_key, "LIVEKIT_API_KEY")
-            livekit_api_secret = _secret(body.livekit_api_secret, "LIVEKIT_API_SECRET")
-            if not livekit_url or not livekit_api_key or not livekit_api_secret:
-                raise HTTPException(400, "URL et cles LiveKit Cloud requises.")
-        else:
-            livekit_url = "ws://localhost:7880"
-            livekit_api_key = "devkey"
-            livekit_api_secret = "devsecretdevsecretdevsecretdevsecret"
 
     elevenlabs_api_key = _secret(body.elevenlabs_api_key, "ELEVENLABS_API_KEY")
     elevenlabs_voice_id = (
@@ -224,9 +202,6 @@ async def setup_complete(body: SetupCompletePayload) -> dict:
         "ELEVENLABS_VOICE_ID": elevenlabs_voice_id,
         "ELEVENLABS_MODEL": body.elevenlabs_model,
         "WHISPER_MODEL": "tiny",
-        "LIVEKIT_URL": livekit_url,
-        "LIVEKIT_API_KEY": livekit_api_key,
-        "LIVEKIT_API_SECRET": livekit_api_secret,
         "DEEPGRAM_API_KEY": deepgram_api_key,
         "AISSTREAM_KEY": _secret(body.aisstream_key, "AISSTREAM_KEY"),
         "FACE_RECOGNITION_ENABLED": "true" if body.face_recognition_enabled else "false",

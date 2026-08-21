@@ -21,7 +21,7 @@ Actions sur **push d'un tag `vX.Y.Z`**. Plus de build manuel ni d'upload à la m
    - zippe le projet + `bundle/` en **`crush-offline-windows-v0.3.5.zip`**,
    - crée la **release `v0.3.5`** et y attache le zip.
 
-   Durée : ~15-25 min (téléchargement Python + deps + modèles + livekit).
+   Durée : ~15-25 min (téléchargement Python + deps + modèles).
 
 5. Vérifie la release sur GitHub : l'asset `crush-offline-windows-v0.3.5.zip`
    (~650 Mo) doit être présent, accompagné de son sidecar

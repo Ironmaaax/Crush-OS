@@ -9,3 +9,10 @@
 #
 # `-text` : git ne transforme rien dans ce dossier, ni a l'entree ni a la sortie.
 src/crush/interfaces/ui/static/vendor/** -text
+
+# Scripts shell : LF obligatoire. Sur Windows, core.autocrlf les sort en CRLF, et
+# un deploiement par `tar` vers le Pi y expedie alors des CR que bash refuse
+# (« command not found » sur des lignes valides). Frole en deployant ce projet.
+*.sh text eol=lf
+crush text eol=lf
+setup.sh text eol=lf

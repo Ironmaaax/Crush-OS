@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "── CRUSH-OS (conteneur) ──────────────────────────"
-echo "API + voice agent — LiveKit Cloud (pas de serveur local)"
+echo "API seule — le pipeline vocal vit dans l API, sur /ws/voice"
 echo "────────────────────────────────────────────────────"
 
 cleanup() {
@@ -14,11 +14,5 @@ trap cleanup INT TERM
 
 # API (port 8000)
 uv run python -m crush.app &
-
-# Laisse l'API démarrer avant de lancer le voice agent
-sleep 4
-
-# Voice agent — se connecte à LiveKit Cloud via LIVEKIT_URL/.env
-uv run python -m crush.interfaces.voice.agent dev &
 
 wait

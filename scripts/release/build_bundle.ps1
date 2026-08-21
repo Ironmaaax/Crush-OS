@@ -37,7 +37,7 @@ New-Item -ItemType Directory -Path $bundleRoot, $modelsDir, $piperDir, $binDir -
 # path baked into python.exe, which is NOT relocatable across machines. The std
 # venv reads `home` from pyvenv.cfg, so it can be re-homed on the target machine
 # (see scripts/release/rehome_bundle.ps1).
-Write-Host "[1/6] Embed relocatable Python into bundle/python" -ForegroundColor Cyan
+Write-Host "[1/5] Embed relocatable Python into bundle/python" -ForegroundColor Cyan
 if (Test-Path $pythonDir) { Remove-Item -Recurse -Force $pythonDir }
 $pyInstallCache = Join-Path $bundleRoot ".python-install"
 if (Test-Path $pyInstallCache) { Remove-Item -Recurse -Force $pyInstallCache }
@@ -53,14 +53,14 @@ Remove-Item -Recurse -Force $pyInstallCache
 $bundleBasePython = Join-Path $pythonDir "python.exe"
 if (-not (Test-Path $bundleBasePython)) { throw "bundle base python missing." }
 
-Write-Host "[2/6] Create relocatable venv (std venv --copies)" -ForegroundColor Cyan
+Write-Host "[2/5] Create relocatable venv (std venv --copies)" -ForegroundColor Cyan
 if (Test-Path $venvPath) { Remove-Item -Recurse -Force $venvPath }
 & $bundleBasePython -m venv --copies $venvPath
 if ($LASTEXITCODE -ne 0) { throw "venv creation failed." }
 $bundlePython = Join-Path $venvPath "Scripts\python.exe"
 if (-not (Test-Path $bundlePython)) { throw "bundle venv python missing." }
 
-Write-Host "[3/6] Install deps + crush into venv" -ForegroundColor Cyan
+Write-Host "[3/5] Install deps + crush into venv" -ForegroundColor Cyan
 # L'extra `vision` (ultralytics + opencv) est inclus : sans lui le bundle
 # embarquait les poids yolov8n.pt SANS la bibliotheque capable de les lire, donc
 # une detection d'objets morte a l'installation. C'est ce qui faisait tomber
@@ -73,11 +73,11 @@ if ($LASTEXITCODE -ne 0) { throw "crush.setup_app not importable in bundle venv.
 & $bundlePython -c "import ultralytics, cv2"
 if ($LASTEXITCODE -ne 0) { throw "vision extra not importable in bundle venv." }
 
-Write-Host "[4/6] Copy uv binary" -ForegroundColor Cyan
+Write-Host "[4/5] Copy uv binary" -ForegroundColor Cyan
 $uvExe = (Get-Command uv).Source
 Copy-Item $uvExe (Join-Path $binDir "uv.exe") -Force
 
-Write-Host "[5/6] Download ML models" -ForegroundColor Cyan
+Write-Host "[5/5] Download ML models" -ForegroundColor Cyan
 # Poids YOLO telecharges DIRECTEMENT, comme les voix Piper juste en dessous.
 # L'ancienne version instanciait `ultralytics.YOLO` pour declencher le
 # telechargement en effet de bord. Or l'extra `vision` n'est PAS installe dans le
@@ -122,37 +122,6 @@ if (-not (Test-Path $piperOnnx)) {
     }
 }
 
-Write-Host "[6/6] Download livekit-server" -ForegroundColor Cyan
-$lkTarget = Join-Path $binDir "livekit-server.exe"
-if (-not (Test-Path $lkTarget)) {
-    # Authentifie l'appel API GitHub si un token est présent (CI) : les runners
-    # partagent des IP très sollicitées et la limite anonyme (60/h) y est vite
-    # atteinte. En local (pas de GITHUB_TOKEN) -> appel anonyme comme avant.
-    $lkHeaders = @{ "User-Agent" = "crush-bundle" }
-    if ($env:GITHUB_TOKEN) { $lkHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/livekit/livekit/releases/latest" -Headers $lkHeaders
-    $asset = $release.assets | Where-Object { $_.name -match '^livekit_.*_windows_amd64\.zip$' } | Select-Object -First 1
-    if (-not $asset) {
-        throw "livekit windows asset not found in latest release."
-    }
-    $zipPath = Join-Path $env:TEMP "livekit-server.zip"
-    if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-    curl.exe -fL --retry 3 -o $zipPath $asset.browser_download_url
-    if ($LASTEXITCODE -ne 0) { throw "livekit download failed." }
-    $zipSize = (Get-Item $zipPath).Length
-    if ($zipSize -lt 1000000) { throw "livekit zip too small ($zipSize bytes), download likely corrupted." }
-    $extractDir = Join-Path $env:TEMP "livekit-extract"
-    if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
-    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-    tar -xf $zipPath -C $extractDir
-    if ($LASTEXITCODE -ne 0) { throw "livekit zip extraction failed." }
-    $extracted = Get-ChildItem $extractDir -Filter "livekit-server.exe" -Recurse | Select-Object -First 1
-    if (-not $extracted) { throw "livekit-server.exe not found in archive." }
-    Copy-Item $extracted.FullName $lkTarget -Force
-    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-}
-
 Write-Host "Write manifest" -ForegroundColor Cyan
 $manifest = @{
     version = "2"
@@ -168,7 +137,6 @@ $manifest = @{
     }
     bin = @{
         uv = "bin/uv.exe"
-        livekit = "bin/livekit-server.exe"
     }
 } | ConvertTo-Json -Depth 5
 $manifestPath = Join-Path $bundleRoot "manifest.json"

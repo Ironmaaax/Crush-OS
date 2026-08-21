@@ -223,22 +223,6 @@ def _bundle_model_path(manifest: dict[str, Any], key: str, default_rel: str) -> 
     return path if path.is_file() else None
 
 
-def resolve_livekit_binary() -> Path | None:
-    manifest = load_manifest()
-    rel = manifest.get("bin", {}).get("livekit")
-    if rel:
-        path = BUNDLE_DIR / rel
-        if path.is_file():
-            return path
-    for candidate in (
-        BUNDLE_DIR / "bin" / _platform_bin_name("livekit-server"),
-        PROJECT_ROOT / "bin" / _platform_bin_name("livekit-server"),
-    ):
-        if candidate.is_file():
-            return candidate
-    return None
-
-
 def _asset_status(
     *,
     label: str,
@@ -330,26 +314,9 @@ def prerequisites_status() -> dict[str, Any]:
         label="piper", project_path=PIPER_PROJECT, bundle_path=piper_bundle
     )
 
-    livekit = resolve_livekit_binary()
-    livekit_project = PROJECT_ROOT / "bin" / _platform_bin_name("livekit-server")
-    livekit_in_project = livekit_project.is_file()
-    livekit_in_bundle = livekit is not None and str(livekit).startswith(str(BUNDLE_DIR))
-    if livekit:
-        if livekit_in_project and livekit == livekit_project:
-            livekit_location = "project"
-        elif livekit_in_bundle:
-            livekit_location = "bundle"
-        else:
-            livekit_location = "project"
-        livekit_detail_text = _rel_project(livekit)
-    else:
-        livekit_location = None
-        livekit_detail_text = None
-
     bundle_valid = inspection["valid"]
     yolo_ok = yolo_detail["ok"]
     piper_ok = piper_detail["ok"]
-    livekit_ok = livekit is not None
 
     return {
         "bundle": bundle_valid,
@@ -372,14 +339,5 @@ def prerequisites_status() -> dict[str, Any]:
         "yolo_detail": yolo_detail,
         "piper_model": piper_ok,
         "piper_detail": piper_detail,
-        "livekit_binary": livekit_ok,
-        "livekit_path": str(livekit) if livekit else None,
-        "livekit_detail": {
-            "ok": livekit_ok,
-            "location": livekit_location,
-            "detail": livekit_detail_text,
-            "project_path": str(livekit_project) if livekit_in_project else None,
-            "bundle_path": str(livekit) if livekit_in_bundle and livekit is not None else None,
-        },
         "offline_ready": bundle_valid and python_ok and yolo_ok and piper_ok,
     }

@@ -91,12 +91,6 @@ function Invoke-CrushPython {
     & uv run python @PyArgs
 }
 
-function Get-LivekitCommand {
-    $bundled = Join-Path $PSScriptRoot "bundle\bin\livekit-server.exe"
-    if (Test-Path $bundled) { return $bundled }
-    return "livekit-server"
-}
-
 function Get-DotEnvValue {
     param(
         [string]$Key,
@@ -179,10 +173,9 @@ function Stop-CrushRuntime {
     param(
         [int[]]$ExtraPorts = @()
     )
-    Stop-Process -Name "livekit-server" -Force -ErrorAction SilentlyContinue
 
     $apiPort = [int](Get-DotEnvValue -Key "PORT" -Default "8000")
-    $ports = @(7880, 7881, 8765, $apiPort) + $ExtraPorts
+    $ports = @(8765, $apiPort) + $ExtraPorts
     Stop-PortListeners -Ports ($ports | Select-Object -Unique)
 
     $rootPattern = [regex]::Escape($PSScriptRoot)
@@ -255,35 +248,9 @@ function Invoke-CrushRun {
     Write-Host ""
 
     $logDir = Initialize-CrushLogDir
-    $lkLog = Join-Path $logDir "livekit.log"
     $apiLog = Join-Path $logDir "api.log"
-    $voiceLog = Join-Path $logDir "voice.log"
 
     $procs = @()
-
-    Write-Host "  LiveKit  demarrage..." -ForegroundColor Yellow
-    $lkCmd = Get-LivekitCommand
-    $lkProc = Start-BackgroundProcess `
-        -CommandLine "$lkCmd --dev --node-ip 127.0.0.1 --keys `"devkey: devsecretdevsecretdevsecretdevsecret`"" `
-        -LogPath $lkLog
-    $procs += $lkProc
-
-    if (Wait-HttpOk -Url "http://127.0.0.1:7880/" -TimeoutSeconds 40) {
-        Write-Host "  LiveKit  ws://localhost:7880" -ForegroundColor Green
-    } else {
-        Write-Host "  LiveKit  le serveur LiveKit n'a pas demarre" -ForegroundColor Red
-        if (Test-Path $lkLog) {
-            Write-Host ""
-            Write-Host "  --- dernieres lignes de $lkLog ---" -ForegroundColor DarkGray
-            Get-Content $lkLog -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "  $_" -ForegroundColor DarkGray
-            }
-            Write-Host "  Causes frequentes : port 7880 occupe, ou livekit-server absent." -ForegroundColor DarkGray
-            Write-Host ""
-        }
-        foreach ($p in $procs) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
-        exit 1
-    }
 
     # Preflight : verifie l'environnement (deps natives, .env, port) et explique
     # clairement tout probleme AVANT de tenter de lancer l'API (evite le timeout opaque).
@@ -320,32 +287,6 @@ function Invoke-CrushRun {
         exit 1
     }
 
-    Write-Host "  Vocal    prechauffement (~10s)..." -ForegroundColor Yellow
-    $python = Get-CrushPython
-    $voiceCmd = if ($python) {
-        "set PYTHONWARNINGS=ignore&& `"$python`" -m crush.interfaces.voice.agent dev --log-level info"
-    } else {
-        "set PYTHONWARNINGS=ignore&& uv run python -m crush.interfaces.voice.agent dev --log-level info"
-    }
-    $voiceProc = Start-BackgroundProcess `
-        -CommandLine $voiceCmd `
-        -LogPath $voiceLog
-    $procs += $voiceProc
-
-    if (Wait-LogMatch -LogPath $voiceLog -Pattern "Crush vocal prêt" -TimeoutSeconds 90) {
-        Write-Host "  Vocal    pret" -ForegroundColor Green
-    } else {
-        Write-Host "  Vocal    prechauffement long ou echec" -ForegroundColor Yellow
-        if (Test-Path $voiceLog) {
-            Write-Host "  --- dernieres lignes de $voiceLog ---" -ForegroundColor DarkGray
-            Get-Content $voiceLog -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "  $_" -ForegroundColor DarkGray
-            }
-            Write-Host ""
-        }
-    }
-
-    Write-Host ""
     Write-Host "  Crush pret" -ForegroundColor Green
     Write-Host "  -> http://localhost:$apiPort/admin" -ForegroundColor White
     Write-Host "  -> clique sur le micro pour le mode vocal" -ForegroundColor DarkGray
@@ -354,8 +295,8 @@ function Invoke-CrushRun {
     Write-Host ""
 
     try {
-        # N'attendre que les process encore vivants : si l'un est deja sorti
-        # (ex. agent vocal qui crashe au warmup), Wait-Process leverait
+        # N'attendre que les process encore vivants : si l'un est deja sorti,
+        # Wait-Process leverait
         # "Impossible de trouver un processus assorti de l'identificateur".
         $alive = @($procs | Where-Object { $_ -and -not $_.HasExited })
         if ($alive) {
@@ -380,17 +321,16 @@ $guardCommand = if ($Command.Trim() -ne "") { $Command } else { "setup" }
 # contente d'expliquer et de sortir.
 $guardReadOnly = $Command.Trim() -eq "" -or
                  $Command.ToLowerInvariant() -notin @(
-                     "eclosion", "setup", "run", "start", "api", "voice", "livekit"
+                     "eclosion", "setup", "run", "start", "api"
                  )
 Invoke-CrushOneDriveGuard `
     -ProjectRoot $PSScriptRoot `
     -NonInteractive:($guardReadOnly -or $env:CI -eq "true") `
     -RelaunchCommand $guardCommand
 
-# Restart complet uniquement : `run`/`start` relancent toute la pile, `setup` a
-# besoin du port 8765. `api`, `voice` et `livekit` sont documentees comme
-# composables (un composant par terminal, cf. l'aide plus bas) — les inclure ici
-# ferait que `.\crush.ps1 voice` tue l'API et LiveKit lances juste avant.
+# Restart complet uniquement : `run`/`start` relancent la pile, `setup` a besoin
+# du port 8765. `api` reste composable (un composant par terminal) — l'inclure
+# ici ferait qu'un `.\crush.ps1 api` tue l'instance lancee juste avant.
 switch ($Command.ToLowerInvariant()) {
     { $_ -in @("eclosion", "setup", "run", "start") } {
         Stop-CrushRuntime
@@ -409,13 +349,6 @@ switch ($Command.ToLowerInvariant()) {
     "api" {
         Invoke-CrushPython "-m" "crush.app"
     }
-    "voice" {
-        Invoke-CrushPython "-m" "crush.interfaces.voice.agent" "dev"
-    }
-    "livekit" {
-        $lk = Get-LivekitCommand
-        & $lk --dev --node-ip 127.0.0.1 --keys "devkey: devsecretdevsecretdevsecretdevsecret"
-    }
     { $_ -in @("run", "start") } {
         Invoke-CrushRun
     }
@@ -427,12 +360,6 @@ switch ($Command.ToLowerInvariant()) {
         } catch {
             Write-Host "  FastAPI  eteint (port $port)" -ForegroundColor Yellow
         }
-        if (Get-Command livekit-server -ErrorAction SilentlyContinue) {
-            Write-Host "  LiveKit  binaire installe" -ForegroundColor Green
-        } else {
-            Write-Host "  LiveKit  binaire absent" -ForegroundColor Yellow
-            Write-Host "  https://github.com/livekit/livekit/releases" -ForegroundColor DarkGray
-        }
         if (Get-Command uv -ErrorAction SilentlyContinue) {
             Write-Host "  uv       installe" -ForegroundColor Green
         } else {
@@ -443,10 +370,8 @@ switch ($Command.ToLowerInvariant()) {
         Write-Host ""
         Write-Host "  Usage : .\crush.ps1 <commande>"
         Write-Host ""
-        Write-Host "    run        demarre tout (LiveKit + API + Voice)"
+        Write-Host "    run        demarre l API (chat + vocal sur /ws/voice)"
         Write-Host "    api        serveur FastAPI uniquement"
-        Write-Host "    voice      pipeline vocal LiveKit"
-        Write-Host "    livekit    serveur LiveKit local"
         Write-Host "    setup      assistant web de configuration"
         Write-Host "    eclosion   alias de setup"
         Write-Host "    doctor     diagnostic rapide"
