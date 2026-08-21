@@ -1,4 +1,8 @@
-# Baseline runtime — capturée en Phase A pour la GATE B8 (continuité des données).
+# ARCHIVE — ne pas prendre pour un gate.
+# Baseline runtime capturée en Phase A pour la GATE B8 (continuité des données),
+# migration désormais terminée. Elle dépend de l'état runtime d'UNE machine et
+# n'est donc pas reproductible en CI : aucun gate ne la vérifie, par construction
+# et non par oubli (cf. l'avertissement CDC §0.5 dans snapshot_data_state.py).
 # Ce fichier est committable (comptes uniquement). Le contenu réel reste local.
 
 facts.total = 18

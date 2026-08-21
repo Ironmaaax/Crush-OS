@@ -90,8 +90,18 @@ def enregistrer_config(config: dict[str, Any]) -> None:
 
 def assistant_configuration() -> dict[str, Any]:
     print("── Configuration de l'agent ──\n")
-    defaut_hote = "jarvis.tailef56ca.ts.net"
-    hote = input(f"Adresse du serveur [{defaut_hote}] : ").strip() or defaut_hote
+    # Le defaut vient de la config precedente de CETTE machine, jamais d'un hote
+    # code en dur. La ligne suivante lit un jeton d'acces que `url_websocket`
+    # place ensuite dans l'URL : un defaut pointant vers une machine qui n'est pas
+    # la tienne enverrait une tentative d'authentification a un tiers, sur une
+    # simple pression d'Entree. Mieux vaut refuser que deviner.
+    precedent = str(charger_config().get("hote") or "")
+    if precedent:
+        hote = input(f"Adresse du serveur [{precedent}] : ").strip() or precedent
+    else:
+        hote = input("Adresse du serveur (ex. crush.ton-tailnet.ts.net) : ").strip()
+    if not hote:
+        raise SystemExit("Aucune adresse de serveur fournie - configuration annulee.")
     # getpass : le jeton ne doit pas rester dans l'historique du terminal.
     jeton = getpass.getpass("Jeton d'accès (invisible) : ").strip()
     nom = input(f"Nom de cette machine [{socket.gethostname()}] : ").strip() or socket.gethostname()
