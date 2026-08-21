@@ -1,0 +1,11 @@
+# Assets servis au navigateur, verifies par empreinte SHA-256 dans
+# scripts/vendor_assets.lock.json.
+#
+# Toute conversion de fins de ligne par git change leurs octets, donc leur
+# empreinte : constate, gsap.min.js passe de 71 520 a 71 531 octets apres un
+# checkout avec core.autocrlf=true (11 LF devenus CRLF). Le controle du preflight
+# echouerait alors sur CHAQUE clone Windows neuf, et bloquerait le demarrage pour
+# une raison qui n'a rien a voir avec une alteration reelle.
+#
+# `-text` : git ne transforme rien dans ce dossier, ni a l'entree ni a la sortie.
+src/crush/interfaces/ui/static/vendor/** -text
