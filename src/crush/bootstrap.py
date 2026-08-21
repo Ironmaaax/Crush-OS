@@ -143,6 +143,9 @@ class Container:
     memory_kernel: MemoryKernel
     memory_ingest: MemoryIngest
     memory_mirror: MemoryMirror
+    # Consignes ecrites a la main (Obsidian ou page Coffre). Expose pour que
+    # l'API puisse declencher une passe sans attendre le planificateur.
+    boite_memoire: BoiteReception
     user_model: UserModel
 
     # ── Providers L1 — LLM ─────────────────────────────────────────────────
@@ -609,6 +612,7 @@ def build(
         memory_kernel=memory_kernel,
         memory_ingest=memory_ingest,
         memory_mirror=memory_mirror,
+        boite_memoire=boite_memoire,
         user_model=user_model,
         # Providers L1 — LLM
         llm=llm,

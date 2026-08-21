@@ -121,6 +121,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.user_model = container.user_model
     app.state.memory_kernel = container.memory_kernel
     app.state.memory_mirror = container.memory_mirror
+    # Pour la page Coffre : « retenir » passe par la chaîne d'extraction, et
+    # « appliquer maintenant » relit la boîte sans attendre la passe suivante.
+    app.state.memory_ingest = container.memory_ingest
+    app.state.boite_memoire = container.boite_memoire
     app.state.skill_synthesizer = container.skill_synthesizer
     app.state.skill_lab = container.skill_lab
     app.state.skill_lifecycle = container.skill_lifecycle

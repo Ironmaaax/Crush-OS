@@ -64,6 +64,22 @@ class MirrorReport:
     facts_exported: int
 
 
+@dataclass
+class DocumentMiroir:
+    """Un document du miroir et les faits qu'il contient.
+
+    Existe pour que l'export Markdown et la vue web du coffre partagent LA même
+    répartition. Elles la calculaient séparément : une catégorie ajoutée dans
+    `_CATEGORY_TO_FILE` aurait déplacé un fait dans Obsidian sans le déplacer
+    dans l'interface, et les deux vues se seraient contredites sans que rien ne
+    signale laquelle avait tort.
+    """
+
+    fichier: str
+    titre: str
+    faits: list[Fact]
+
+
 class MemoryMirror:
     """Exporte le contenu du Kernel vers une arborescence Markdown lisible."""
 
@@ -76,13 +92,16 @@ class MemoryMirror:
     def root(self) -> Path:
         return self._dir
 
-    def export(self) -> MirrorReport:
-        """Régénère TOUS les fichiers du miroir depuis l'état SQLite actuel."""
-        # Récupère tous les facts actifs + ceux à revoir (séparés)
+    def grouper(self) -> list[DocumentMiroir]:
+        """Quel fait va dans quel document — SOURCE UNIQUE de la répartition.
+
+        Extrait d'`export()` pour que la vue web du coffre s'appuie exactement
+        dessus au lieu de la recalculer. Ne touche à aucun fichier : c'est une
+        lecture, utilisable par une requête HTTP sans effet de bord.
+        """
         active = self._kernel.list_facts_by_status(FactStatus.ACTIVE)
         needs_review = self._kernel.list_facts_by_status(FactStatus.NEEDS_REVIEW)
 
-        # Bucket par fichier cible
         by_file: dict[str, list[Fact]] = {}
         uncertain: list[Fact] = []
         for f in active:
@@ -96,26 +115,34 @@ class MemoryMirror:
                 continue
             by_file.setdefault(target, []).append(f)
 
+        docs = [
+            DocumentMiroir(fichier=nom, titre=_file_to_title(nom), faits=faits)
+            for nom, faits in by_file.items()
+        ]
+        if uncertain:
+            docs.append(
+                DocumentMiroir(
+                    fichier=_UNCERTAIN_FILE, titre="Croyances incertaines", faits=uncertain
+                )
+            )
+        if needs_review:
+            docs.append(
+                DocumentMiroir(
+                    fichier=_NEEDS_REVIEW_FILE,
+                    titre="Facts à revoir (vocabulaire hors liste)",
+                    faits=needs_review,
+                )
+            )
+        return docs
+
+    def export(self) -> MirrorReport:
+        """Régénère TOUS les fichiers du miroir depuis l'état SQLite actuel."""
         written: list[str] = []
         total = 0
-        for filename, facts in by_file.items():
-            self._write_file(filename, facts)
-            written.append(filename)
-            total += len(facts)
-
-        if uncertain:
-            self._write_file(_UNCERTAIN_FILE, uncertain, title_override="Croyances incertaines")
-            written.append(_UNCERTAIN_FILE)
-            total += len(uncertain)
-
-        if needs_review:
-            self._write_file(
-                _NEEDS_REVIEW_FILE,
-                needs_review,
-                title_override="Facts à revoir (vocabulaire hors liste)",
-            )
-            written.append(_NEEDS_REVIEW_FILE)
-            total += len(needs_review)
+        for doc in self.grouper():
+            self._write_file(doc.fichier, doc.faits, title_override=doc.titre)
+            written.append(doc.fichier)
+            total += len(doc.faits)
 
         logger.info("Memory mirror exported", files=len(written), facts=total)
         return MirrorReport(files_written=written, facts_exported=total)

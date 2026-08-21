@@ -1,5 +1,5 @@
 /* capabilities.js — Atelier (Capacités) v2
- * 9 sous-pages : Intégrations · Skills · Routines · Vues · Store · Écosystème · Appareils · Fils · Mémoire
+ * 10 sous-pages : Intégrations · Skills · Routines · Vues · Store · Écosystème · Appareils · Fils · Mémoire · Coffre
  */
 (function () {
   "use strict";
@@ -15,6 +15,7 @@
     { id: "appareils",    label: "Appareils" },
     { id: "fils",         label: "Fils" },
     { id: "memoire",      label: "Mémoire" },
+  { id: "coffre",       label: "Coffre" },
   ];
 
   let _activePage = "integrations";
@@ -1692,6 +1693,274 @@
     root.innerHTML = ""; root.appendChild(page);
   }
 
+
+  /* ─────────────────────────────────────────
+     10 Coffre — la mémoire telle qu'Obsidian la montre, mais corrigeable
+
+     La sous-page « Mémoire » répond déjà à « qu'est-ce que Crush sait ? », sous
+     forme de tableau. Elle ne répond pas à « où ce souvenir vit-il, et à côté de
+     quoi ? » — la question qu'on se pose vraiment en relisant sa propre mémoire,
+     et celle qu'Obsidian rend lisible.
+
+     Ce qui est montré ici est le KERNEL, pas les fichiers .md. Les deux disent la
+     même chose, mais les fichiers ne sont réécrits qu'à la passe nocturne : les
+     lire donnerait l'état d'hier matin et ferait croire qu'une correction n'a pas
+     été prise en compte. La répartition en documents, elle, vient de
+     `mirror.grouper()` — la même source que l'export Markdown, pour que les deux
+     vues ne puissent pas se contredire.
+  ───────────────────────────────────────── */
+
+  async function renderCoffre() {
+    let data = { documents: [], total_faits: 0, boite: { existe: false, contenu: "" } };
+    let erreur = null;
+    try { data = await J.api.get("/api/memory/coffre"); }
+    catch (e) { erreur = e.message; }
+
+    const wrap = el("div", { style: { display: "flex", flexDirection: "column", gap: "32px" } });
+
+    if (erreur) {
+      wrap.appendChild(el("div", { class: "j-empty", text: "Coffre illisible : " + erreur }));
+      const p = pageWrapper("coffre", "Le coffre", null, wrap);
+      root.innerHTML = ""; root.appendChild(p); return;
+    }
+
+    let actif = data.documents.length ? 0 : -1;
+
+    /* Volet gauche : les documents. Volet droit : celui qui est ouvert. */
+    const explorateur = el("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } });
+    const lecture = el("div");
+
+    function dessinerExplorateur() {
+      explorateur.innerHTML = "";
+      let dossierCourant = null;
+      data.documents.forEach(function (doc, i) {
+        if (doc.dossier !== dossierCourant) {
+          dossierCourant = doc.dossier;
+          const d = el("div", { text: dossierCourant || "racine" });
+          d.style.cssText = "font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#666;margin:14px 0 4px 2px;";
+          explorateur.appendChild(d);
+        }
+        const ouvert = i === actif;
+        const item = el("button");
+        item.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;"
+          + "text-align:left;padding:6px 9px;border:0;border-radius:5px;cursor:pointer;font-size:13px;"
+          + "font-family:Geist,sans-serif;background:" + (ouvert ? "rgba(212,175,106,.13)" : "transparent")
+          + ";color:" + (ouvert ? "#d4af6a" : "#bbb") + ";";
+        item.appendChild(el("span", { text: doc.titre }));
+        item.appendChild(el("span", {
+          text: String(doc.faits.length),
+          style: { fontSize: "10px", color: "#666", fontFamily: "Geist Mono, monospace" }
+        }));
+        item.addEventListener("click", function () {
+          actif = i; dessinerExplorateur(); dessinerLecture();
+        });
+        explorateur.appendChild(item);
+      });
+    }
+
+    /* Une ligne = un fait. Le clic sur l'objet le rend modifiable SUR PLACE :
+       c'est tout l'intérêt de lire sa mémoire dans un document plutôt que dans un
+       tableau — on corrige là où on a vu l'erreur, sans changer d'écran. */
+    function ligneFait(f) {
+      const li = el("div");
+      li.style.cssText = "display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);";
+      li.appendChild(el("span", { text: "•", style: { color: "#555", flex: "0 0 auto" } }));
+
+      const corps = el("div", { style: { flex: "1 1 auto", minWidth: "0" } });
+      const phrase = el("div");
+      phrase.style.cssText = "font-size:14px;line-height:1.55;";
+      phrase.appendChild(el("span", { text: f.subject + " ", style: { color: "#8a8a8a" } }));
+      phrase.appendChild(el("span", { text: f.predicate + " ", style: { color: "#d4af6a" } }));
+
+      const objet = el("span", { text: f.object });
+      objet.style.cssText = "color:#eee;border-bottom:1px dashed rgba(212,175,106,.35);cursor:text;";
+      objet.title = "Cliquer pour corriger";
+      objet.addEventListener("click", function () { editerObjet(f, objet, phrase); });
+      phrase.appendChild(objet);
+      corps.appendChild(phrase);
+
+      const meta = el("div");
+      meta.style.cssText = "font-size:10.5px;color:#666;font-family:Geist Mono, monospace;margin-top:2px;";
+      meta.textContent = "conf " + Math.round(f.confidence * 100) + "% · imp "
+        + Math.round(f.importance * 100) + "% · vu " + f.support_count + "× · " + f.decay_policy
+        + (f.valid_to ? " · échéance " + f.valid_to : "") + "  ^" + f.ancre;
+      corps.appendChild(meta);
+      li.appendChild(corps);
+
+      /* « Oublier » archive, ne supprime pas : un souvenir qu'on demande
+         d'oublier est justement celui dont on veut pouvoir constater plus tard
+         qu'il a existé. Même choix que la boîte de réception. */
+      const oublier = el("button", { text: "oublier" });
+      oublier.style.cssText = "flex:0 0 auto;background:none;border:0;color:#666;font-size:11px;cursor:pointer;padding:2px 4px;";
+      oublier.addEventListener("mouseenter", function () { oublier.style.color = "#c66"; });
+      oublier.addEventListener("mouseleave", function () { oublier.style.color = "#666"; });
+      oublier.addEventListener("click", async function () {
+        oublier.disabled = true; oublier.textContent = "…";
+        try {
+          await J.api.post("/api/memory/correct", {
+            target_fact_id: f.id, new_status: "archived",
+            correction_text: "oublié depuis la page Coffre"
+          });
+          J.notify({ kind: "success", text: "Oublié : " + f.object });
+          await renderCoffre();
+        } catch (e) {
+          J.notify({ kind: "error", text: e.message });
+          oublier.disabled = false; oublier.textContent = "oublier";
+        }
+      });
+      li.appendChild(oublier);
+      return li;
+    }
+
+    function editerObjet(f, noeudObjet, phrase) {
+      const champ = el("input");
+      champ.type = "text"; champ.value = f.object;
+      champ.style.cssText = "font-size:14px;font-family:Geist,sans-serif;color:#eee;background:#161616;"
+        + "border:1px solid #3a3a3a;border-radius:4px;padding:2px 6px;min-width:200px;";
+      phrase.replaceChild(champ, noeudObjet);
+      champ.focus(); champ.select();
+
+      let fini = false;
+      function annuler() {
+        if (fini) return;
+        fini = true;
+        phrase.replaceChild(noeudObjet, champ);
+      }
+
+      async function valider() {
+        if (fini) return;
+        const nouveau = champ.value.trim();
+        if (!nouveau || nouveau === f.object) { annuler(); return; }
+        fini = true;
+        champ.disabled = true;
+        try {
+          const r = await J.api.post("/api/memory/correct", {
+            target_fact_id: f.id, new_object: nouveau,
+            correction_text: "corrigé depuis la page Coffre"
+          });
+          if (!r.fact_found) throw new Error("ce souvenir n'existe plus");
+          J.notify({ kind: "success", text: "Corrigé : " + nouveau });
+          await renderCoffre();
+        } catch (e) {
+          J.notify({ kind: "error", text: e.message });
+          fini = false; champ.disabled = false;
+        }
+      }
+
+      champ.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") { ev.preventDefault(); valider(); }
+        else if (ev.key === "Escape") { ev.preventDefault(); annuler(); }
+      });
+      champ.addEventListener("blur", valider);
+    }
+
+    function dessinerLecture() {
+      lecture.innerHTML = "";
+      if (actif < 0) {
+        lecture.appendChild(el("div", { class: "j-empty", text: "Aucun souvenir enregistré pour l'instant." }));
+        return;
+      }
+      const doc = data.documents[actif];
+
+      const titre = el("h2", { text: doc.titre });
+      titre.style.cssText = "font-family:Space Grotesk,Geist,sans-serif;font-size:22px;color:#eee;margin:0 0 2px;";
+      lecture.appendChild(titre);
+
+      const chemin = el("div", { text: doc.fichier + " · " + doc.faits.length + " fait(s)" });
+      chemin.style.cssText = "font-size:11px;color:#666;font-family:Geist Mono, monospace;margin-bottom:18px;";
+      lecture.appendChild(chemin);
+
+      const corps = el("div");
+      doc.faits.forEach(function (f) { corps.appendChild(ligneFait(f)); });
+      lecture.appendChild(corps);
+    }
+
+    dessinerExplorateur();
+    dessinerLecture();
+
+    const deux = el("div");
+    deux.style.cssText = "display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:28px;align-items:start;";
+    /* Sur téléphone, deux colonnes écraseraient le document : la page se consulte
+       depuis un mobile au moins autant que depuis un bureau. */
+    if (window.matchMedia && window.matchMedia("(max-width: 720px)").matches) {
+      deux.style.gridTemplateColumns = "minmax(0,1fr)";
+    }
+    deux.appendChild(explorateur);
+    deux.appendChild(lecture);
+    wrap.appendChild(ghostSec(
+      "Documents",
+      data.total_faits + " faits · même répartition que le miroir Obsidian",
+      null, deux
+    ));
+
+    /* ── Retenir ── */
+    const retWrap = el("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } });
+    const retTa = el("textarea", { class: "mem-textarea" });
+    retTa.rows = 3;
+    retTa.placeholder = "je passe au thé vert le matin";
+    retWrap.appendChild(retTa);
+    const retBtn = el("button", { class: "m-btn m-btn--save", text: "Retenir" });
+    retBtn.addEventListener("click", async function () {
+      const texte = retTa.value.trim();
+      if (!texte) { J.notify({ kind: "error", text: "Rien à retenir." }); return; }
+      retBtn.disabled = true; retBtn.textContent = "…";
+      try {
+        const r = await J.api.post("/api/memory/retenir", { texte: texte });
+        if (r.retenus) J.notify({ kind: "success", text: r.retenus + " fait(s) retenu(s)" });
+        else if (r.deja_sus) J.notify({ kind: "success", text: "Déjà su (" + r.deja_sus + " confirmé(s))" });
+        else J.notify({ kind: "success", text: "Noté, aucun fait durable à en tirer" });
+        retTa.value = "";
+        await renderCoffre();
+      } catch (e) {
+        J.notify({ kind: "error", text: e.message });
+        retBtn.disabled = false; retBtn.textContent = "Retenir";
+      }
+    });
+    retWrap.appendChild(el("div", { class: "mem-btn-row" }, retBtn));
+    wrap.appendChild(ghostSec(
+      "Retenir quelque chose",
+      "passe par la même extraction que les conversations, pas par une écriture directe",
+      null, retWrap
+    ));
+
+    /* ── Boîte de réception : le même geste, depuis Obsidian ── */
+    const bWrap = el("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } });
+    if (!data.boite.existe) {
+      bWrap.appendChild(el("div", { class: "j-empty", text: "Fichier absent — il est créé au démarrage du service." }));
+    } else {
+      const vueBoite = el("pre", { text: data.boite.contenu });
+      vueBoite.style.cssText = "margin:0;padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);"
+        + "border-radius:6px;font-family:Geist Mono, monospace;font-size:11.5px;line-height:1.6;color:#bbb;"
+        + "max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;";
+      bWrap.appendChild(vueBoite);
+      const bBtn = el("button", { class: "m-btn", text: "Appliquer maintenant" });
+      bBtn.addEventListener("click", async function () {
+        bBtn.disabled = true; bBtn.textContent = "…";
+        try {
+          const r = await J.api.post("/api/memory/coffre/traiter", null);
+          const bouts = [];
+          if (r.appliquees) bouts.push(r.appliquees + " appliquée(s)");
+          if (r.ignorees) bouts.push(r.ignorees + " sans effet");
+          if (r.incomprises) bouts.push(r.incomprises + " incomprise(s)");
+          J.notify({ kind: "success", text: bouts.length ? bouts.join(", ") : "Rien en attente." });
+          await renderCoffre();
+        } catch (e) {
+          J.notify({ kind: "error", text: e.message });
+          bBtn.disabled = false; bBtn.textContent = "Appliquer maintenant";
+        }
+      });
+      bWrap.appendChild(el("div", { class: "mem-btn-row" }, bBtn));
+    }
+    wrap.appendChild(ghostSec(
+      "Boîte de réception",
+      "ce que tu écris dans Obsidian ; relue toutes les 10 min, ou tout de suite",
+      null, bWrap
+    ));
+
+    const page = pageWrapper("coffre", "Le coffre", null, wrap);
+    root.innerHTML = ""; root.appendChild(page);
+  }
+
   /* ─────────────────────────────────────────
      ROUTER
   ───────────────────────────────────────── */
@@ -1705,6 +1974,7 @@
     appareils:    renderAppareils,
     fils:         renderFils,
     memoire:      renderMemoire,
+    coffre:       renderCoffre,
   };
 
   function navigate(pageId) {

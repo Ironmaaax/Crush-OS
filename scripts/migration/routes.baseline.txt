@@ -63,6 +63,7 @@ GET     /api/macropad/profile
 GET     /api/macropad/status
 GET     /api/macropad/workspace
 GET     /api/macropad/workspace/validate
+GET     /api/memory/coffre
 GET     /api/memory/facts
 GET     /api/memory/index
 GET     /api/memory/topics
@@ -152,7 +153,9 @@ POST    /api/macropad/open-device-manager
 POST    /api/macropad/upload
 POST    /api/macropad/workspace
 POST    /api/memory/autodream
+POST    /api/memory/coffre/traiter
 POST    /api/memory/correct
+POST    /api/memory/retenir
 POST    /api/memory/trigger-deep
 POST    /api/music/next
 POST    /api/music/pause

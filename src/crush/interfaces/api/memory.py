@@ -12,6 +12,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from crush.kernel.settings import settings
+from crush.providers.memory.boite_reception import NOM_FICHIER
+from crush.providers.memory.mirror import ancre_de_fait
 from crush.providers.memory.schemas import FactStatus
 
 router = APIRouter()
@@ -259,3 +261,129 @@ async def trigger_deep(request: Request) -> dict:
 
     asyncio.create_task(auto_dream.deep_analyze(), name="autodream-deep-manual")
     return {"triggered": True, "scope": "deep"}
+
+
+# ── Le coffre : le miroir tel qu'Obsidian le montre, mais modifiable ───────────
+#
+# La page Atelier/Mémoire existait déjà, sous forme de tableau de faits. Elle
+# répondait à « qu'est-ce que Crush sait ? » mais pas à « où ce souvenir vit-il,
+# et à côté de quoi ? » — or c'est cette question qu'on se pose en relisant sa
+# propre mémoire, et c'est précisément ce qu'Obsidian rend lisible.
+#
+# Ces deux routes montrent donc la MÊME répartition en documents que le miroir
+# Markdown (via `mirror.grouper()`, sa source unique) et acceptent les deux
+# gestes qui manquaient depuis un navigateur : corriger une ligne là où on la
+# lit, et dicter un nouveau souvenir.
+
+
+class _RetenirBody(BaseModel):
+    texte: str
+
+
+@router.get("/api/memory/coffre")
+async def lire_le_coffre(request: Request) -> dict:
+    """Le miroir en documents, avec l'ancre Obsidian de chaque fait.
+
+    Lecture du KERNEL, pas des fichiers .md. Les deux disent la même chose, mais
+    les fichiers ne sont réécrits qu'à la passe nocturne : les lire ici
+    afficherait l'état d'hier matin et donnerait l'impression qu'une correction
+    n'a pas été prise en compte.
+    """
+    mirror = getattr(request.app.state, "memory_mirror", None)
+    if mirror is None:
+        raise HTTPException(503, "Miroir mémoire non disponible.")
+
+    documents = [
+        {
+            "fichier": doc.fichier,
+            "titre": doc.titre,
+            "dossier": doc.fichier.split("/")[0] if "/" in doc.fichier else "",
+            "faits": [
+                {
+                    "id": f.id,
+                    "ancre": ancre_de_fait(f.id),
+                    "subject": f.subject,
+                    "predicate": f.predicate,
+                    "object": f.object,
+                    "category": f.category,
+                    "confidence": round(f.confidence, 3),
+                    "importance": round(f.importance, 3),
+                    "support_count": f.support_count,
+                    "decay_policy": f.decay_policy.value,
+                    "valid_to": f.valid_to.date().isoformat() if f.valid_to else None,
+                    "last_seen_at": f.last_seen_at.isoformat(),
+                }
+                # Même tri que le rendu Markdown : la page web et Obsidian
+                # doivent présenter les faits dans le même ordre, sinon on
+                # cherche dans l'une ce qu'on a vu dans l'autre.
+                for f in sorted(
+                    doc.faits,
+                    key=lambda f: (-(f.importance * f.confidence), -f.support_count),
+                )
+            ],
+        }
+        for doc in sorted(mirror.grouper(), key=lambda d: d.fichier)
+    ]
+
+    boite = mirror.root / NOM_FICHIER
+    return {
+        "documents": documents,
+        "total_faits": sum(len(d["faits"]) for d in documents),
+        # De quoi afficher la boîte de réception à côté : c'est le même geste,
+        # depuis un autre appareil.
+        "boite": {
+            "existe": boite.exists(),
+            "contenu": boite.read_text(encoding="utf-8") if boite.exists() else "",
+        },
+    }
+
+
+@router.post("/api/memory/retenir")
+async def retenir_un_souvenir(body: _RetenirBody, request: Request) -> dict:
+    """Confie un souvenir en texte libre à la mémoire.
+
+    Passe par la chaîne d'extraction complète — la même que celle qui lit les
+    conversations, garde-fou persona inclus — et non par une écriture directe :
+    un fait inséré à la main échapperait à la réconciliation et créerait un
+    doublon du souvenir qu'il était censé préciser.
+    """
+    texte = body.texte.strip()
+    if not texte:
+        raise HTTPException(400, "Rien à retenir.")
+
+    ingest = getattr(request.app.state, "memory_ingest", None)
+    if ingest is None:
+        raise HTTPException(503, "Extraction de faits non disponible.")
+
+    rendu = await ingest.ingest(content=texte, source="ui_coffre", event_type="user_statement")
+    nouveaux = list(getattr(rendu, "new_facts", None) or [])
+    confirmes = list(getattr(rendu, "confirmed", None) or [])
+    return {
+        "retenus": len(nouveaux),
+        "deja_sus": len(confirmes),
+        "faits": [
+            {"id": f.id, "subject": f.subject, "predicate": f.predicate, "object": f.object}
+            for f in nouveaux
+        ],
+    }
+
+
+@router.post("/api/memory/coffre/traiter")
+async def traiter_la_boite(request: Request) -> dict:
+    """Applique tout de suite ce qui attend dans la boîte de réception.
+
+    Sans ça, une correction écrite depuis Obsidian attend la passe suivante — au
+    plus dix minutes, mais dix minutes pendant lesquelles on doute que ça ait
+    marché, et on la réécrit.
+    """
+    boite = getattr(request.app.state, "boite_memoire", None)
+    if boite is None:
+        raise HTTPException(503, "Boîte de réception non disponible.")
+    resultat = await boite.traiter()
+    return {
+        "appliquees": resultat.appliquees,
+        "ignorees": resultat.ignorees,
+        "incomprises": resultat.incomprises,
+        "retenus": resultat.retenus,
+        "erreur": resultat.erreur,
+    }
