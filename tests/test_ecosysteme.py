@@ -12,8 +12,11 @@ téléphone.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from crush.interfaces.api import ecosysteme as eco
 from crush.interfaces.api.ecosysteme import ecosysteme
 
 
@@ -38,6 +41,17 @@ def test_chaque_probleme_porte_son_remede(vue: dict) -> None:
         if m["etat"] in {"degrade", "absent"} and not m["remede"].strip()
     ]
     assert not muets, f"état dégradé sans remède : {muets}"
+
+
+def test_un_maillon_sain_ne_propose_pas_de_remede(vue: dict) -> None:
+    """La réciproque de l'invariant, et elle compte autant.
+
+    Un remède affiché sous un voyant vert envoie agir là où rien ne cloche, et
+    décrédibilise les remèdes qui, eux, sont utiles. C'est aussi le genre d'erreur
+    qu'un copier-coller de chaîne introduit sans qu'aucun autre test ne s'en émeuve.
+    """
+    bavards = [m["nom"] for m in vue["maillons"] if m["etat"] == "ok" and m["remede"].strip()]
+    assert not bavards, f"maillon sain porteur d'un remède : {bavards}"
 
 
 def test_les_familles_sont_toutes_renseignees(vue: dict) -> None:
@@ -65,3 +79,27 @@ def test_l_execution_hors_conteneur_est_surveillee(vue: dict) -> None:
     """
     noms = {m["nom"] for m in vue["maillons"]}
     assert "Exécution hors conteneur" in noms
+
+
+def test_invariant_du_remede_tient_sur_une_installation_neuve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rejoue l'invariant sur une machine SANS base mémoire.
+
+    La fixture `vue` lit le vrai dossier de données : sur un poste de dev la base
+    existe depuis le premier échange, donc la branche « aucune base » n'y est
+    jamais prise. C'est ce trou qui a laissé passer un maillon `absent` au remède
+    vide — visible seulement en CI, où le checkout est neuf. Le test échouait donc
+    là où personne ne pouvait le reproduire.
+    """
+    import asyncio
+
+    monkeypatch.setattr(eco, "MEMORY_DATA_DIR", tmp_path)
+    vue = asyncio.run(eco.ecosysteme(None))  # type: ignore[arg-type]
+
+    muets = [
+        m["nom"]
+        for m in vue["maillons"]
+        if m["etat"] in {"degrade", "absent"} and not m["remede"].strip()
+    ]
+    assert not muets, f"état dégradé sans remède : {muets}"

@@ -138,7 +138,7 @@ def _memoire() -> list[dict]:
                 "Mémoire",
                 _ABSENT,
                 "aucune base — elle se crée au premier échange",
-                "",
+                "Échanger un premier message avec l'assistant : la base se crée seule.",
                 "memoire",
             )
         ]
