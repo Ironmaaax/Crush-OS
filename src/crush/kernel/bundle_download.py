@@ -26,16 +26,12 @@ from crush.kernel.bundle import (
     stage_models_from_bundle,
 )
 
-BUNDLE_RELEASE_VERSION = "v0.3.2"
+BUNDLE_RELEASE_VERSION = "v0.3.4"
 BUNDLE_CDN_ROOT = (
     f"https://github.com/Ironmaaax/Crush-OS/releases/download/{BUNDLE_RELEASE_VERSION}"
 )
 BUNDLE_ZIP_URL = f"{BUNDLE_CDN_ROOT}/crush-offline-windows-{BUNDLE_RELEASE_VERSION}.zip"
-# ATTENTION : cette taille est celle de l'archive de l'ancien hebergement tiers.
-# Elle ne correspondra PAS a l'asset produit par build-windows-bundle.yml, et la
-# verification ligne ~185 fera echouer le telechargement jusqu'a ce qu'elle soit
-# remplacee par la taille reelle de ta propre release.
-BUNDLE_ZIP_BYTES = 657_929_168
+BUNDLE_ZIP_BYTES = 650_611_147
 # Empreinte de l'archive publiee. VIDE = non verifiee : seule la taille l'est, or
 # une taille identique ne prouve rien sur le contenu, et l'archive contient un venv
 # Python et des binaires qui seront EXECUTES sur la machine de l'utilisateur.
@@ -44,7 +40,7 @@ BUNDLE_ZIP_BYTES = 657_929_168
 # `crush-offline-windows-<tag>.zip.sha256` a cote de l'archive, et
 # `python scripts/pin_bundle.py <tag>` fige ici la taille exacte et l'empreinte
 # relevees sur l'artefact reellement publie.
-BUNDLE_ZIP_SHA256 = ""
+BUNDLE_ZIP_SHA256 = "d436b680f33a375706977b8ceeb60179ca552f6b2eb756cb4387fb074e371713"
 
 _lock = threading.Lock()
 _state: dict[str, Any] = {

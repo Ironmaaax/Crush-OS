@@ -10,35 +10,35 @@ Actions sur **push d'un tag `vX.Y.Z`**. Plus de build manuel ni d'upload à la m
 3. Tag la version et pousse le tag :
 
    ```bash
-   git tag v0.3.3
-   git push origin v0.3.3
+   git tag v0.3.5
+   git push origin v0.3.5
    ```
 
 4. Le workflow **« Build Windows offline bundle »** se déclenche
    (`.github/workflows/build-windows-bundle.yml`) :
    - build le bundle sur un runner **Windows** (`scripts/release/build_bundle.ps1`),
    - vérifie qu'il est complet,
-   - zippe le projet + `bundle/` en **`crush-offline-windows-v0.3.3.zip`**,
-   - crée la **release `v0.3.3`** et y attache le zip.
+   - zippe le projet + `bundle/` en **`crush-offline-windows-v0.3.5.zip`**,
+   - crée la **release `v0.3.5`** et y attache le zip.
 
    Durée : ~15-25 min (téléchargement Python + deps + modèles + livekit).
 
-5. Vérifie la release sur GitHub : l'asset `crush-offline-windows-v0.3.3.zip`
-   (~700 MB) doit être présent, accompagné de son sidecar
-   `crush-offline-windows-v0.3.3.zip.sha256`.
+5. Vérifie la release sur GitHub : l'asset `crush-offline-windows-v0.3.5.zip`
+   (~650 Mo) doit être présent, accompagné de son sidecar
+   `crush-offline-windows-v0.3.5.zip.sha256`.
 
 6. **Épingle l'empreinte**, sinon le téléchargement du bundle ne vérifie que la
-   taille — et une taille identique ne prouve rien sur 700 MB de binaires qui
+   taille — et une taille identique ne prouve rien sur 650 Mo de binaires qui
    seront exécutés chez l'utilisateur :
 
    ```bash
-   python scripts/pin_bundle.py v0.3.3
+   python scripts/pin_bundle.py v0.3.5
    git add src/crush/kernel/bundle_download.py
-   git commit -m "release: epingler l'empreinte du bundle v0.3.3"
+   git commit -m "release: epingler l'empreinte du bundle v0.3.5"
    ```
 
    Le script lit la taille exacte dans l'API des releases et l'empreinte dans le
-   sidecar : aucun téléchargement des 700 MB. `--check` compare sans écrire.
+   sidecar : aucun téléchargement des 650 Mo. `--check` compare sans écrire.
 
 ## Important
 

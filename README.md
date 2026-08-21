@@ -77,7 +77,7 @@ Deux profils distincts :
 
 ### Utilisateur final (Windows)
 
-Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle/`** : l'assistant web le télécharge pour toi en un clic (~628 Mo). Tu n'as **pas** besoin d'installer Python, uv, cmake, Visual C++ ni LiveKit sur ta machine, ni d'extraire manuellement une archive offline.
+Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle/`** : l'assistant web le télécharge pour toi en un clic (~650 Mo). Tu n'as **pas** besoin d'installer Python, uv, cmake, Visual C++ ni LiveKit sur ta machine, ni d'extraire manuellement une archive offline.
 
 | Requis | Notes |
 |---|---|
@@ -108,7 +108,8 @@ Python système et LiveKit **ne sont pas requis** : le script de build les intè
 |---|---|
 | [LiveKit Cloud](https://livekit.io/) | Alternative au serveur local (déjà dans le bundle) |
 | Docker | Code-agent, Skill Lab sandbox |
-| `uv sync --extra vision` | Reconnaissance faciale (`dlib`), sur Windows, peut exiger [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (workload C++) |
+| `uv sync --extra vision` | Détection d'objets YOLOv8 + OpenCV. **Déjà inclus dans le bundle Windows**, à installer seulement pour un parcours de développement |
+| `uv sync --extra face` | Reconnaissance faciale — `dlib` compile depuis les sources ; sur Windows, peut exiger [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (workload C++) |
 | `nowplaying-cli` | macOS uniquement, lecture locale « now playing » |
 
 ---
@@ -117,7 +118,7 @@ Python système et LiveKit **ne sont pas requis** : le script de build les intè
 
 ### Parcours A : Utilisateur final (Windows)
 
-**Clone Git ou archive sans `bundle/`** : à l'étape 1 du setup, clique sur **Télécharger** — le wizard récupère `bundle.zip` (~628 Mo), l'extrait dans `bundle/` et vérifie les prérequis. **Aucune extraction manuelle.** **Release avec `bundle/` déjà inclus** : le bouton n'apparaît pas, tu passes directement à la configuration.
+**Clone Git ou archive sans `bundle/`** : à l'étape 1 du setup, clique sur **Télécharger** — le wizard récupère l'archive (~650 Mo), l'extrait dans `bundle/` et vérifie les prérequis. **Aucune extraction manuelle.** **Release avec `bundle/` déjà inclus** : le bouton n'apparaît pas, tu passes directement à la configuration.
 
 > **OneDrive interdit.** Ne place pas `crush-OS` dans OneDrive (Documents synchronisés, etc.) : OneDrive casse les liens symboliques du venv Python embarqué. Au premier lancement, Crush **bloque l'installation** et propose soit un **déplacement automatique** vers un dossier local (Documents hors sync, ou `%USERPROFILE%\crush-OS`), soit des instructions pour déplacer manuellement puis relancer `setup.bat`.
 
