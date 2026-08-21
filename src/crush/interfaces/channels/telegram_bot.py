@@ -98,6 +98,17 @@ def _url_api(chemin: str) -> str:
     return f"http://127.0.0.1:{settings.port}{chemin}"
 
 
+def _entetes_api() -> dict[str, str]:
+    """En-tetes pour les appels locaux a l'API.
+
+    Le bot est un client programmatique comme un autre : il doit s'authentifier.
+    Sans ce Bearer, `/api/initiatives` renvoyait 401 des que API_AUTH_ENABLED est
+    actif -- et le message montre a l'utilisateur ne parlait pas d'authentification.
+    """
+    jeton = settings.api_token.get_secret_value()
+    return {"Authorization": f"Bearer {jeton}"} if jeton else {}
+
+
 class TelegramChannel(ChannelAdapter):
     """Canal Telegram pour Crush.
 
@@ -264,8 +275,11 @@ class TelegramChannel(ChannelAdapter):
             import httpx
 
             async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get(_url_api("/api/health"))
-                health = r.json()
+                r = await client.get(_url_api("/api/health"), headers=_entetes_api())
+            if r.status_code != 200:
+                await update.message.reply_text(f"❌ L'API a répondu {r.status_code}.")
+                return
+            health = r.json()
             checks = health.get("checks", {})
             lines = []
             for name, info in checks.items():
@@ -289,9 +303,24 @@ class TelegramChannel(ChannelAdapter):
             import httpx
 
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(_url_api("/api/initiatives"))
-                data = r.json()
-            initiatives = [i for i in data.get("initiatives", []) if i.get("status") == "pending"]
+                r = await client.get(_url_api("/api/initiatives"), headers=_entetes_api())
+            if r.status_code != 200:
+                # Sans ce controle, un 401 rendait {"detail": ...}, dont
+                # `.get("initiatives", [])` valait [] : le bot annoncait « aucune
+                # initiative en attente » alors qu'il n'avait pas pu demander.
+                # Une fausse assurance est pire qu'une erreur.
+                await update.message.reply_text(
+                    f"❌ L'API a répondu {r.status_code} — impossible de savoir "
+                    "s'il y a des initiatives en attente."
+                )
+                return
+            # L'endpoint rend une LISTE, deja filtree sur les initiatives en
+            # attente (`load_pending_all`). L'ancien code attendait un objet
+            # {"initiatives": [...]} et filtrait sur un champ `status` absent.
+            initiatives = r.json()
+            if not isinstance(initiatives, list):
+                await update.message.reply_text("❌ Réponse inattendue de l'API.")
+                return
             if not initiatives:
                 await update.message.reply_text("✅ Aucune initiative en attente.")
                 return
