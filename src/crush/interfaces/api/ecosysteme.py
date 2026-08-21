@@ -31,6 +31,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
+from crush.interfaces.channels.push import dernier_envoi
 from crush.kernel import quota_cartes
 from crush.kernel.paths import MEMORY_DATA_DIR, SAUVEGARDES_DIR
 from crush.kernel.remote_agents import registry
@@ -155,6 +156,10 @@ def _memoire() -> list[dict]:
 # Au-delà, la passe quotidienne ne tourne manifestement plus. 36 h laisse passer
 # une machine éteinte une nuit sans crier au loup.
 _AGE_ALERTE_H = 36
+
+
+def _age_h(quand: datetime) -> float:
+    return (datetime.now() - quand).total_seconds() / 3600
 
 
 def _age_lisible(heures: float) -> str:
@@ -302,11 +307,35 @@ def _initiatives_poussees() -> dict:
             "Activer TELEGRAM_ENABLED et renseigner son owner.",
             "autonomie",
         )
+    # La configuration ne prouve rien. Un canal activé, avec un token valide et le
+    # bon identifiant, reste incapable d'écrire tant que l'utilisateur n'a pas
+    # parlé au bot le premier : Telegram refuse par « chat not found ». D'où la
+    # lecture du dernier envoi RÉEL — un voyant vert pendant que tout échoue est
+    # exactement ce que cette page dit vouloir éviter.
+    dernier = dernier_envoi()
+    seuil = settings.push_notify_priority_min
+    if dernier is not None and not dernier.reussi:
+        return _maillon(
+            "Initiatives poussées",
+            _DEGRADE,
+            f"le dernier envoi a échoué {_age_lisible(_age_h(dernier.horodatage))} "
+            f"— {dernier.erreur or 'raison inconnue'}",
+            "Écrire une première fois au bot : il ne peut pas engager la conversation.",
+            "autonomie",
+        )
+    if dernier is None:
+        return _maillon(
+            "Initiatives poussées",
+            _OK,
+            f"configuré, aucun envoi encore effectué (seuil « {seuil} »)",
+            "",
+            "autonomie",
+        )
     return _maillon(
         "Initiatives poussées",
         _OK,
-        f"décisions toujours poussées, notifications à partir de "
-        f"« {settings.push_notify_priority_min} »",
+        f"dernier envoi réussi {_age_lisible(_age_h(dernier.horodatage))}, "
+        f"notifications à partir de « {seuil} »",
         "",
         "autonomie",
     )

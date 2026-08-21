@@ -26,13 +26,23 @@ from types import SimpleNamespace
 import pytest
 
 from crush.engine.proactive.engine import ProactiveEngine, _atteint_le_seuil
-from crush.interfaces.channels.push import CanalPoussant, PushCanaux
+from crush.interfaces.api.ecosysteme import _initiatives_poussees
+from crush.interfaces.channels import push as module_push
+from crush.interfaces.channels.push import CanalPoussant, DernierEnvoi, PushCanaux
 from crush.kernel.schemas import (
     ExecutionMode,
     Initiative,
     InitiativeType,
     Priority,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reinitialise_le_dernier_envoi() -> object:
+    """`_dernier` est un module-global : sans remise a zero, l'ordre des tests compte."""
+    module_push._dernier = None
+    yield
+    module_push._dernier = None
 
 
 def _initiative(mode: ExecutionMode, priorite: Priority = Priority.HIGH) -> Initiative:
@@ -227,3 +237,72 @@ async def test_sans_push_branche_le_comportement_d_avant_est_intact() -> None:
     await moteur._dispatch(_initiative(ExecutionMode.NOTIFY))
 
     assert recu, "la file de notifications doit rester servie"
+
+
+# ── Le voyant ne doit pas mentir ─────────────────────────────────────────────
+
+
+async def test_le_dernier_envoi_reussi_est_enregistre() -> None:
+    push = PushCanaux([_CanalOk()])
+    assert module_push.dernier_envoi() is None
+
+    await push.pousser("x")
+
+    dernier = module_push.dernier_envoi()
+    assert dernier is not None and dernier.reussi
+    assert dernier.erreur is None
+
+
+async def test_le_dernier_envoi_retient_la_raison_de_l_echec() -> None:
+    push = PushCanaux([_CanalMuet()])
+
+    await push.pousser("x")
+
+    dernier = module_push.dernier_envoi()
+    assert dernier is not None and not dernier.reussi
+    assert dernier.erreur and "bot non démarré" in dernier.erreur
+
+
+def test_ecosysteme_degrade_quand_le_dernier_envoi_a_echoue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le cas reel : token valide, identifiant correct, et « chat not found ».
+
+    Un bot Telegram ne peut pas engager la conversation. La configuration seule
+    aurait affiche un voyant vert pendant que chaque envoi echouait.
+    """
+    monkeypatch.setenv("TELEGRAM_ENABLED", "true")
+    module_push._dernier = DernierEnvoi(
+        horodatage=datetime.now(), reussi=False, erreur="telegram : chat not found"
+    )
+
+    maillon = _initiatives_poussees()
+
+    assert maillon["etat"] == "degrade"
+    assert "chat not found" in maillon["detail"]
+    assert maillon["remede"], "un etat degrade sans remede ne vaut rien"
+
+
+def test_ecosysteme_vert_seulement_apres_un_envoi_reussi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TELEGRAM_ENABLED", "true")
+    module_push._dernier = DernierEnvoi(horodatage=datetime.now(), reussi=True)
+
+    maillon = _initiatives_poussees()
+
+    assert maillon["etat"] == "ok"
+    assert "réussi" in maillon["detail"]
+    assert maillon["remede"] == ""
+
+
+def test_ecosysteme_ne_pretend_rien_avant_le_premier_envoi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ni vert menteur, ni rouge injustifie : on dit qu'on n'a pas encore essaye."""
+    monkeypatch.setenv("TELEGRAM_ENABLED", "true")
+
+    maillon = _initiatives_poussees()
+
+    assert maillon["etat"] == "ok"
+    assert "aucun envoi encore" in maillon["detail"]

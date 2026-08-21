@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from loguru import logger
@@ -41,6 +43,32 @@ class CanalPoussant(Protocol):
     async def send_message(self, text: str) -> None: ...
 
 
+@dataclass
+class DernierEnvoi:
+    """Resultat de la derniere tentative reelle d'envoi."""
+
+    horodatage: datetime
+    reussi: bool
+    erreur: str | None = None
+
+
+# Etat observe, lu par la page Ecosysteme. Meme motif que
+# `kernel/notifications.set_proactive_queue` : un module-global assume plutot
+# qu'une dependance tiree a travers trois couches pour un seul affichage.
+#
+# POURQUOI : le maillon se fondait sur la CONFIGURATION. Or un canal active, avec
+# un token valide et le bon identifiant, reste incapable d'ecrire tant que
+# l'utilisateur n'a pas parle au bot le premier -- Telegram refuse alors par
+# « chat not found ». La page affichait donc un voyant vert pendant que chaque
+# envoi echouait, ce que sa propre docstring dit vouloir eviter.
+_dernier: DernierEnvoi | None = None
+
+
+def dernier_envoi() -> DernierEnvoi | None:
+    """La derniere tentative, ou None si aucune n'a encore eu lieu."""
+    return _dernier
+
+
 class PushCanaux:
     """Pousse un texte vers tous les canaux capables d'écrire d'eux-mêmes."""
 
@@ -49,6 +77,7 @@ class PushCanaux:
         # de la méthode, pas sa signature. C'est exactement le contrôle voulu :
         # on trie les canaux par capacité, sans imposer d'héritage.
         self._canaux: list[CanalPoussant] = [c for c in canaux if isinstance(c, CanalPoussant)]
+        self._derniere_erreur: str | None = None
         if self._canaux:
             logger.info("Push sortant actif", canaux=[_nom(c) for c in self._canaux])
         else:
@@ -67,15 +96,23 @@ class PushCanaux:
         le souhait d'être joint sur plusieurs. Et l'échec de l'un — bot arrêté,
         réseau coupé — ne doit pas priver les autres.
         """
+        global _dernier
         if not self._canaux:
             return False
         resultats = await asyncio.gather(*(self._envoyer(c, texte) for c in self._canaux))
-        return any(resultats)
+        abouti = any(resultats)
+        _dernier = DernierEnvoi(
+            horodatage=datetime.now(),
+            reussi=abouti,
+            erreur=None if abouti else self._derniere_erreur,
+        )
+        return abouti
 
     async def _envoyer(self, canal: CanalPoussant, texte: str) -> bool:
         try:
             await canal.send_message(texte)
         except Exception as exc:  # noqa: BLE001 — un canal muet ne doit pas casser le cycle
+            self._derniere_erreur = f"{_nom(canal)} : {exc}"
             logger.warning("Push impossible", canal=_nom(canal), erreur=str(exc))
             return False
         return True
