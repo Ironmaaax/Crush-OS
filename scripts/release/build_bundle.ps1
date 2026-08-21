@@ -61,10 +61,17 @@ $bundlePython = Join-Path $venvPath "Scripts\python.exe"
 if (-not (Test-Path $bundlePython)) { throw "bundle venv python missing." }
 
 Write-Host "[3/6] Install deps + crush into venv" -ForegroundColor Cyan
-uv pip install --python $bundlePython -e .
+# L'extra `vision` (ultralytics + opencv) est inclus : sans lui le bundle
+# embarquait les poids yolov8n.pt SANS la bibliotheque capable de les lire, donc
+# une detection d'objets morte a l'installation. C'est ce qui faisait tomber
+# l'archive a 371 Mio contre ~700 pour les releases de reference.
+# L'extra `face` reste dehors : dlib compile depuis les sources.
+uv pip install --python $bundlePython -e ".[vision]"
 if ($LASTEXITCODE -ne 0) { throw "crush package install failed." }
 & $bundlePython -c "import crush.setup_app"
 if ($LASTEXITCODE -ne 0) { throw "crush.setup_app not importable in bundle venv." }
+& $bundlePython -c "import ultralytics, cv2"
+if ($LASTEXITCODE -ne 0) { throw "vision extra not importable in bundle venv." }
 
 Write-Host "[4/6] Copy uv binary" -ForegroundColor Cyan
 $uvExe = (Get-Command uv).Source

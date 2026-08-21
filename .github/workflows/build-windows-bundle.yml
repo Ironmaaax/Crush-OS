@@ -121,8 +121,12 @@ jobs:
           Compress-Archive -Path $top -DestinationPath $zip -CompressionLevel Optimal
           $sizeMB = [math]::Round((Get-Item $zip).Length / 1MB)
           Write-Host "Zip produit : $zip ($sizeMB MB)"
-          # Ceinture-bretelles par-dessus la vérif par chemin : un vrai bundle pèse ~700 MB.
-          if ($sizeMB -lt 300) {
+          # Ceinture-bretelles par-dessus la vérif par chemin. Le seuil était à
+          # 300 : bien trop bas, il a laissé passer sans un mot une archive de
+          # 371 Mio à laquelle manquaient torch, opencv et ultralytics — soit la
+          # moitié du bundle. Les releases de référence pèsent 613 à 719 Mio ;
+          # 500 attrape une perte massive sans se déclencher à tort.
+          if ($sizeMB -lt 500) {
             Write-Host "::error::Zip trop petit ($sizeMB MB) — build probablement incomplet."
             exit 1
           }
