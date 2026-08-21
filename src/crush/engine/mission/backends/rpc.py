@@ -15,7 +15,7 @@ Sécurité :
   - Tout dispatch passe par approval_checker si configuré
   - Le backend reste sandboxé (Docker ou opt-in local)
 
-Inspiré de hermes-agent code_execution_tool.py (MIT License, NousResearch).
+Inspiré de hermes-agent code_execution_tool.py (NousResearch).
 Voir notices/exec-backends.md pour l'attribution complète.
 """
 

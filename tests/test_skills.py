@@ -28,7 +28,6 @@ _SAMPLE_SKILL_MD = """\
 name: web-research
 description: Recherche web multi-sources avec synthèse. Utiliser pour toute requête
   nécessitant des informations récentes.
-license: MIT
 metadata:
   author: crush-synthesizer
   version: "1.0"

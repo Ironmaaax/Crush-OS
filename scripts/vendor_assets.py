@@ -1,5 +1,4 @@
 # Copyright (C) 2026 Maxime Song
-# This file is part of CRUSH-OS, licensed under the GNU AGPL-3.0-or-later.
 
 """Rapatriement des assets front lourds — MediaPipe et ses modèles.
 

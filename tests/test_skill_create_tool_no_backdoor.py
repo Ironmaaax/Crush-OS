@@ -53,7 +53,6 @@ _VALID_SKILL_MD = """\
 ---
 name: test-pattern-skill
 description: Skill de test pour vérifier que SkillCreateTool passe par le Lab.
-license: MIT
 metadata:
   author: test
   version: "1.0"

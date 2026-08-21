@@ -5,7 +5,7 @@
 """Adaptateur entre le format Crush et le standard ouvert agentskills.io.
 
 Spec : https://agentskills.io/specification
-Format SKILL.md : frontmatter YAML (name, description, license, compatibility,
+Format SKILL.md : frontmatter YAML (name, description, compatibility,
                   metadata, allowed-tools) + corps Markdown.
 """
 
@@ -214,8 +214,6 @@ class AgentSkillsAdapter:
             "capabilities": [],
             "requires_env": [],
             "requires_tools": [],
-            # Champs agentskills.io conservés pour la traçabilité
-            "license": fm.get("license", ""),
             "compatibility": fm.get("compatibility", ""),
         }
 
@@ -227,14 +225,12 @@ class AgentSkillsAdapter:
         author = meta.get("author", "unknown")
         version = meta.get("version", "1.0.0")
         tags = meta.get("tags", [])
-        license_ = meta.get("license", "MIT")
         system_prompt = meta.get("system_prompt", "")
 
         # Frontmatter agentskills.io
         fm_dict = {
             "name": name,
             "description": description,
-            "license": license_,
             "metadata": {
                 "author": author,
                 "version": version,

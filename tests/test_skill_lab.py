@@ -54,7 +54,6 @@ _GOOD_SKILL_MD = """\
 ---
 name: batch-articles
 description: Génère N articles markdown structurés à partir d'un template.
-license: MIT
 metadata:
   author: crush-synthesizer
   version: "1.0"
@@ -75,7 +74,6 @@ Quand l'utilisateur demande de produire plusieurs articles similaires :
 _BROKEN_SKILL_MD = """\
 ---
 description: Skill foireuse sans champ name.
-license: MIT
 metadata:
   author: crush-synthesizer
   version: "1.0"

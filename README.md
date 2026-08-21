@@ -9,10 +9,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![LiveKit](https://img.shields.io/badge/LiveKit-voice-F5A623?style=flat-square)](https://livekit.io)
 [![Claude](https://img.shields.io/badge/Claude-Anthropic-8B5CF6?style=flat-square)](https://anthropic.com)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue?style=flat-square)](https://www.gnu.org/licenses/agpl-3.0.html)
-
-Assistant personnel IA, texte & voix temps réel, self-hosted, open source (AGPL-3.0).
-
 ![CRUSH-OS](CRUSHINTERFACEGITHUB.png)
 
 </div>

@@ -79,7 +79,6 @@ _VALID_SKILL_MD = """\
 ---
 name: test-capability-skill
 description: Skill de test pour le capability engine.
-license: MIT
 metadata:
   author: crush-synthesizer
   version: "1.0"

@@ -24,7 +24,7 @@ class SSHBackend(ExecutionBackend):
     Hash court du user@host:port pour le socket ControlMaster (≤ 104 octets — macOS).
 
     Architecture inspirée de hermes-agent SSHEnvironment
-    (MIT License, NousResearch — voir notices/exec-backends.md).
+    ( NousResearch — voir notices/exec-backends.md).
     """
 
     def __init__(

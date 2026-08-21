@@ -19,7 +19,7 @@ class RemoteBackend(ExecutionBackend):
 
     Persistance serverless (hibernate quand idle) : pattern à implémenter dans
     la sous-classe en s'inspirant de hermes-agent providers/managed_modal.py
-    et providers/daytona.py (MIT License, NousResearch — voir notices/exec-backends.md).
+    et providers/daytona.py ( NousResearch — voir notices/exec-backends.md).
     """
 
     def __init__(self, provider: str = "modal") -> None:

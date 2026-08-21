@@ -5,10 +5,6 @@ description = "Crush — assistant personnel intelligent vocal temps réel"
 authors = [{ name = "Maxime Song" }]
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-license = "AGPL-3.0-or-later"
-classifiers = [
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-]
 # ─────────────────────────────────────────────────────────────────────────────
 # CŒUR — doit s'installer sur un Raspberry Pi 5 (aarch64, headless, 24/7).
 #

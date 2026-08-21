@@ -1,32 +1,11 @@
 # CRUSH-OS — analyse détaillée du projet
 
 
----
-
-## 0. Avertissement   (à lire avant de « participer »)
-
-Ce n'est **pas** un projet B+D. C'est le projet personnel de **Max Ea**
-(`@Ironmaaax`), sous **GNU AGPL-3.0-or-later** :
-
-- ✅ Autorisé : lire, exécuter, modifier, créer une œuvre dérivée, redistribuer,
-  y compris pour un usage commercial.
-- ⚠️ Condition : toute redistribution, **y compris l'exposition du logiciel à
-  travers un réseau** (§13), doit fournir le code source correspondant sous cette
-  même licence.
-
-Une version antérieure de ce document annonçait une « Proprietary Source License »
-interdisant la modification et la redistribution. C'était faux : le dépôt dérive
-d'un travail sous AGPL-3.0, et cette licence accorde précisément ces droits — on
-ne peut pas les retirer en aval.
-
----
-
 ## 1. Carte d'identité
 
 | Champ | Valeur |
 |---|---|
 | Nom | CRUSH-OS (`crush-os`) — assistant personnel IA, texte + voix temps réel, self-hosted |
-| Auteur /   | Max Ea — GNU AGPL-3.0-or-later |
 | Version | `0.2.0` (tag `v0.2.0-architecture`), post-refonte « Opération Squelette » |
 | Langage | Python 3.11 (`>=3.11,<3.14`), tout async |
 | Volume | ~34 500 lignes / 220 modules dans `src/crush/` (les docs citent ~46k au total) |

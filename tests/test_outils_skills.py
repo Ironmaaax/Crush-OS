@@ -112,7 +112,6 @@ _SKILL_MD_VALIDE = """\
 ---
 name: transcription-audio
 description: Transcrit un fichier audio en texte.
-license: MIT
 metadata:
   author: test
   version: "1.0"

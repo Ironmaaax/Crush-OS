@@ -16,7 +16,7 @@ boucle d'outils LLM pour l'un, un sous-processus sandboxé pour l'autre. Tout
 l'expiration produit un message qui dit quoi faire — jamais un silence.
 
 Inspiré de hermes-agent delegate_tool.py et execute_code.py
-(MIT License, NousResearch — voir notices/exec-backends.md).
+(NousResearch — voir notices/exec-backends.md).
 """
 
 from __future__ import annotations

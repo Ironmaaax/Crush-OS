@@ -46,7 +46,6 @@ Génère un SKILL.md complet au format agentskills.io capturant ce savoir-faire.
 Frontmatter YAML obligatoire :
   name        : kebab-case, 2-64 chars (minuscules + chiffres + tirets, pas en début/fin)
   description : précise, max 200 chars — décrit QUAND utiliser ce skill
-  license     : MIT
   metadata    :
     author  : crush-synthesizer
     version : "1.0"
