@@ -1,5 +1,6 @@
 {
   "sha256": {
+    "gsap/gsap.min.js": "efc85c7eb141819717cda0033484a84b1c890d13b02e355a2fec79d424b20e7a",
     "mediapipe/face_mesh-0.4.1633559619/face_mesh.binarypb": "139546bf05aebb33e2611b6b945f3a1629c316ca924e33cec1547c85ddef9f53",
     "mediapipe/face_mesh-0.4.1633559619/face_mesh.js": "5db8555ac80ca2ad7366fbb3ea53c0d0959609fc9abb7b8be37a74ec1ac4ba9c",
     "mediapipe/face_mesh-0.4.1633559619/face_mesh_solution_packed_assets.data": "dbe5905c582c0462cdaea17e7e6ecea92edaa8cccc515c5e2e7291f2cbb5fb99",
@@ -21,6 +22,8 @@
     "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_internal.js": "83564c478f223b8f48f118ee1a44cb1e6ae0c6852a2d3f92578f1ee428d583a3",
     "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_internal.wasm": "82ce4e58488ae07160f1cc9c1aeb09795b95401687845e370ddfab9b1d262051",
     "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_nosimd_internal.js": "64cd4d0671a092c578a4e016653b217d8bf6294645f2e58bf1bdaab8a2c66b0c",
-    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_nosimd_internal.wasm": "1774eb27bdca99c316e56a04a060ac5deade518ae57a2259a76d0fa9e526bd1d"
+    "mediapipe/tasks-vision-0.10.6/wasm/vision_wasm_nosimd_internal.wasm": "1774eb27bdca99c316e56a04a060ac5deade518ae57a2259a76d0fa9e526bd1d",
+    "mermaid/mermaid.min.js": "8d8e0eec56d3a83b4b3c87f42050845546dee93ebe1875d2117c12e6947c0cb3",
+    "three/three.min.js": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
   }
 }

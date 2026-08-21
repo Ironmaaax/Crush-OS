@@ -333,9 +333,9 @@ def check_vendor_assets() -> bool:
     if missing:
         _warn(
             "Assets front absents",
-            f"{len(missing)} fichier(s) MediaPipe manquant(s) sur {len(expected)}.\n"
-            "La reconnaissance faciale, la séquence de réveil et la détection de\n"
-            "gestes seront indisponibles ; le reste de l'assistant fonctionne.\n\n"
+            f"{len(missing)} asset(s) front manquant(s) sur {len(expected)}.\n"
+            "Selon les fichiers concernés : reconnaissance faciale, séquence de réveil,\n"
+            "détection de gestes, animations ou diagrammes ; le reste fonctionne.\n\n"
             "FIX :  python scripts/vendor_assets.py",
         )
 

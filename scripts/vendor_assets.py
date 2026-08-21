@@ -36,6 +36,15 @@ TASKS_VISION_NEW = "0.10.14"  # mediapipe_vision.js + module ESM de index.html
 TASKS_VISION_OLD = "0.10.6"   # wake_sequence.js — API FaceLandmarker de la sequence de reveil
 FACE_MESH = "0.4.1633559619"  # wakeup.js — solution FaceMesh historique
 
+# Bibliotheques front versionnees dans le depot (legeres). Elles sont dans le
+# verrou pour la meme raison que MediaPipe : un fichier servi au navigateur doit
+# etre verifiable. Sans ca, un remplacement global sur le depot les a silencieusement
+# amputees de leurs en-tetes de licence -- gsap -295 o, three -91 o, mermaid -2036 o --
+# sans que rien ne le signale.
+GSAP = "3.12.2"
+THREE = "0.128.0"
+MERMAID = "11.17.0"
+
 _JSD = "https://cdn.jsdelivr.net/npm/@mediapipe"
 _MODELS = "https://storage.googleapis.com/mediapipe-models"
 
@@ -75,6 +84,12 @@ def _assets() -> dict[str, str]:
     root = f"mediapipe/face_mesh-{FACE_MESH}"
     for name in _FACE_MESH_FILES:
         out[f"{root}/{name}"] = f"{_JSD}/face_mesh@{FACE_MESH}/{name}"
+
+    out["gsap/gsap.min.js"] = f"https://cdnjs.cloudflare.com/ajax/libs/gsap/{GSAP}/gsap.min.js"
+    out["three/three.min.js"] = f"https://cdn.jsdelivr.net/npm/three@{THREE}/build/three.min.js"
+    out["mermaid/mermaid.min.js"] = (
+        f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID}/dist/mermaid.min.js"
+    )
 
     out["mediapipe/models/blaze_face_short_range.tflite"] = (
         f"{_MODELS}/face_detector/blaze_face_short_range/float16/1/"
