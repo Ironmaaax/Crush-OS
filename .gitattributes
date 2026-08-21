@@ -16,3 +16,11 @@ src/crush/interfaces/ui/static/vendor/** -text
 *.sh text eol=lf
 crush text eol=lf
 setup.sh text eol=lf
+
+# Unites systemd : LF obligatoire. Un `\r` en fin de directive reste DANS la
+# valeur -- `Environment=PATH=...\r` casse le PATH sans un mot au journal. Meme
+# raison que pour les scripts shell : un checkout Windows suivi d'un deploiement
+# par `tar` expedierait des CRLF sur une machine Linux.
+*.service text eol=lf
+*.timer text eol=lf
+*.conf text eol=lf
