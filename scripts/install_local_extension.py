@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Lie une extension `crush-skills` dans la zone dev de Crush (symlink).
 

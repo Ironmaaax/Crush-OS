@@ -22,8 +22,8 @@ GET     /admin/api/sessions/{session_id}
 GET     /admin/api/tasks
 GET     /api/analytics/active
 GET     /api/analytics/catalog
-GET     /api/analytics/data
 GET     /api/analytics/crush
+GET     /api/analytics/data
 GET     /api/analytics/summary
 GET     /api/analytics/youtube
 GET     /api/approvals/config
@@ -47,6 +47,7 @@ GET     /api/deezer/auth
 GET     /api/deezer/callback
 GET     /api/deezer/player
 GET     /api/deezer/token
+GET     /api/ecosysteme
 GET     /api/events
 GET     /api/globe/config
 GET     /api/globe/flights

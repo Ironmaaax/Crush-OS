@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Miroir Markdown UNIDIRECTIONNEL — SQLite → MD lecture seule (CDC §6.7).
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Arbitrage des suggestions proactives depuis la conversation.
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Process voix LiveKit — second composition root (CDC §C.1.8).
 

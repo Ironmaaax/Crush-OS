@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """
 Détection d'objets en temps réel avec YOLOv8n.

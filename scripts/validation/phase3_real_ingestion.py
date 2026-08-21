@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Mission réelle d'ingestion PHASE 3 — test du Kernel + réconciliation sur vrai LLM.
 

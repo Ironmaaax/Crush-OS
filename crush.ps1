@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $BundleReleaseVersion = "v0.3.2"
-$BundleReleaseUrl = "https://github.com/ ironmax/jarvis-OS/releases/download/$BundleReleaseVersion/jarvis-offline-windows-$BundleReleaseVersion.zip"
+$BundleReleaseUrl = "https://github.com/Ironmaaax/Crush-OS/releases/download/$BundleReleaseVersion/crush-offline-windows-$BundleReleaseVersion.zip"
 
 # Force UTF-8 for every child Python process. When stdout/stderr are redirected to
 # a log file (run command), Python otherwise falls back to the legacy ANSI code page

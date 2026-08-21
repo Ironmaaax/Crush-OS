@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Pattern script-via-RPC : un pipeline multi-étapes = un seul tour LLM.
 

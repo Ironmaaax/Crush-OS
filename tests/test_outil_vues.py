@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests de l'outil show_view — découverte des vues et honnêteté du retour.
 

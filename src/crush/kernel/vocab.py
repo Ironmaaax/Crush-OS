@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Vocabulaires fermés, niveaux d'accès et d'autonomie — contrat PHASE 0 (§3.1–§3.3)."""
 

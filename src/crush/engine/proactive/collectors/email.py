@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """
 EmailCollector — récupère les emails non lus avec le corps complet du thread.

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Trace d'observation de l'ingestion Kernel (MOUVEMENT 2 option D).
 

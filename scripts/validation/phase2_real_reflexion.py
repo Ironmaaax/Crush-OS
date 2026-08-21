@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Mission réelle PHASE 2 — réflexion post-mission avec vrai LLM (CDC §5 DoD).
 

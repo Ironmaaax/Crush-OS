@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests unitaires de hardware.macropad_2k.ihex (decodage Intel HEX)."""
 

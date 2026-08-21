@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Persistance des permissions runtime (kernel.permissions + API /api/permissions).
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests du log d'audit (CDC §9 — toute action laisse une entrée d'audit)."""
 

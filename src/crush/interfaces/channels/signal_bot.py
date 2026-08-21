@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Stub Signal pour Crush — à implémenter via signal-cli ou AsamiSignal."""
 

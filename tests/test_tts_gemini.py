@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests du TTS Gemini : wrap PCM->WAV + routing TTS_PROVIDER."""
 

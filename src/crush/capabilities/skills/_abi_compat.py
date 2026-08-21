@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Alias de namespace `skills` → `crush.capabilities.skills` — CDC §B.2bis.
 

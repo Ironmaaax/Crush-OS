@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """briefing.py — Preset de briefing post-wakeup : ouverture Safari + récap data.
 

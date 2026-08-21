@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests du gate composite à 3 axes (CDC §9, PHASE 1 option α).
 

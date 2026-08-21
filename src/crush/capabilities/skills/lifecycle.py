@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Cycle de vie d'une skill (CDC §7.2) — persisté SQLite dans crush_memory.db.
 

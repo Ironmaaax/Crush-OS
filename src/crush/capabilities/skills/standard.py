@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Adaptateur entre le format Crush et le standard ouvert agentskills.io.
 

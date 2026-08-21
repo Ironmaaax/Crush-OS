@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tool LLM pour signaler un manque de capacité (PHASE 5 §8).
 

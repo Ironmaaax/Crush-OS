@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 """BudgetGuard — contrôle de budget multi-scope avec seuil d'alerte et hard-stop.
 

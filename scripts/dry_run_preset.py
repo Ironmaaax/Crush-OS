@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Affiche la séquence qu'un preset exécuterait, sans rien lancer (CDC §3).
 

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """
 InitiativeGenerator — analyse l'état du monde et génère des initiatives.

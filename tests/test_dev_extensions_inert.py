@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Test d'inertie de la zone dev (~/.crush/extensions/dev/).
 

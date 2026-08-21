@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """
 ContextBuilder — fusionne toutes les sources en un état du monde cohérent.

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Queue pub/sub pour les détections d'objets YOLO → WebSocket browser."""
 

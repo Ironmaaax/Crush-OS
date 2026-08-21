@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Router FastAPI pour les webhooks entrants des canaux de messagerie.
 

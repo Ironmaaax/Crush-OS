@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Alerte de plafond global sur la dépense CONSTATÉE.
 

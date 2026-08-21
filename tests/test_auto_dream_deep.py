@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests d'AutoDream deep ingest batch (MOUVEMENT 2 option D).
 

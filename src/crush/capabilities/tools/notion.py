@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Outil notion_tasks — lit les cases à cocher d'une section d'une page Notion.
 

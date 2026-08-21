@@ -303,12 +303,12 @@ Tout vit dans `memory_data/` (DB `crush_memory.db`, vault `topics/` lisible, ses
 
 ## Dashboard Monde (World Monitor)
 
-L'onglet **Intel Monde** de l'interface Crush affiche [World Monitor](https://github.com/ ironmax/dashboard_monde), un tableau de bord géopolitique temps réel (globe 3D, flux d'actualités IA, radars financiers, suivi d'infrastructures).
+L'onglet **Intel Monde** de l'interface Crush affiche [World Monitor](https://github.com/Ironmaaax/dashboard_monde), un tableau de bord géopolitique temps réel (globe 3D, flux d'actualités IA, radars financiers, suivi d'infrastructures).
 
 **Prérequis :** Node.js 18+
 
 ```bash
-git clone https://github.com/ ironmax/dashboard_monde.git
+git clone https://github.com/Ironmaaax/dashboard_monde.git
 cd dashboard_monde
 npm install
 npm run dev -- --port 3000

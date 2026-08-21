@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Portabilité de la sandbox du Skill Lab (Windows de dev ↔ Debian du Pi).
 

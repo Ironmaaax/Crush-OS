@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Ré-export de kernel.schemas (section Memory) — CDC §A.1.3.
 

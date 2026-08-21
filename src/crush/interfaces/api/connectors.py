@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """État de santé des connecteurs OAuth/API (M5 intégration UI).
 

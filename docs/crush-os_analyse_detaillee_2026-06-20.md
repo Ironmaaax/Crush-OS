@@ -6,7 +6,7 @@
 ## 0. Avertissement   (à lire avant de « participer »)
 
 Ce n'est **pas** un projet B+D. C'est le projet personnel de **Max Ea**
-(`@ ironmax`), sous **Proprietary Source License** (© 2026) :
+(`@Ironmaaax`), sous **Proprietary Source License** (© 2026) :
 
 - ✅ Autorisé : lire le code (perso / éducatif), l'exécuter en privé.
 - ❌ Interdit sans **accord écrit de l'auteur** : modifier, créer une œuvre dérivée,

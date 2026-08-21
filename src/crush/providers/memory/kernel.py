@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Memory Kernel — couche d'accès SQLite source de vérité unique (CDC §6.1, §6.2).
 

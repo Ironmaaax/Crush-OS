@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Analytics — stats Crush locales + YouTube Data API v3 + routes API.
 

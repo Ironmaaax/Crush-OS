@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Décide si une question mérite que le modèle réfléchisse avant de répondre.
 

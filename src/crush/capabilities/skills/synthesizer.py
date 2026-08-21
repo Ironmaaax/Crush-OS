@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Synthétiseur de skills — génère et améliore des skills depuis des tâches accomplies."""
 

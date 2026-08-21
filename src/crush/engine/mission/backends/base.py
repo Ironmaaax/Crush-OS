@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """ABC ExecutionBackend — contrat partagé par tous les backends d'exécution."""
 

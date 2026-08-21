@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests du SkillLab (CDC §7) — gate test-vert-sinon-rejet + polling idempotent.
 

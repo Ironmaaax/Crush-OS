@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests de l'endpoint /api/memory/trigger-deep (MOUVEMENT 2 option D).
 

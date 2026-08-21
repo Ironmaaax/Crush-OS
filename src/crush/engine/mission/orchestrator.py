@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """ProjectOrchestrator — point d'entrée central pour créer, suivre et tuer les projets."""
 

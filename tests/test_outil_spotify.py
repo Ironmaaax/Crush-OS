@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Outil `spotify_control` : introspection, contrat d'actions, choix d'appareil.
 

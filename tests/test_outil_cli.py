@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Audit production : run_script inappelable, whitelist execute_cli héritée de macOS.
 

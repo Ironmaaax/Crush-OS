@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Retrieval : facts actifs + score importance × récence × pertinence × confidence (§6.9).
 

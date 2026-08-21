@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Mission réelle PHASE 4 — Skill Lab sur vrai LLM (CDC §7 DoD).
 

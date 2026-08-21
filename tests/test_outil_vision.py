@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests de l'outil `vision` sur une machine sans caméra ni écran.
 

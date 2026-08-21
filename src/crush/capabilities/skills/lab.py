@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Skill Lab (CDC §7) — génération + test sandbox + cycle de vie.
 

@@ -130,13 +130,49 @@ jobs:
           }
           Write-Host "Archive OK — $count entrées, dossier-chapeau crush-OS/, briques critiques présentes, pas de .venv racine."
 
+      # Empreinte de l'archive RÉELLEMENT publiée. Compress-Archive n'est pas
+      # déterministe au bit près d'un run à l'autre : l'empreinte ne peut donc pas
+      # être connue avant le build, elle doit être relevée ici. Elle est publiée en
+      # sidecar pour que `scripts/pin_bundle.py` puisse l'épingler dans le code sans
+      # avoir à retélécharger 700 MB.
+      - name: Empreinte SHA-256 de l'archive
+        shell: pwsh
+        run: |
+          $zip = $env:ZIP_PATH
+          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLower()
+          $bytes = (Get-Item $zip).Length
+          "$hash  $(Split-Path $zip -Leaf)" | Out-File -FilePath "$zip.sha256" -Encoding ascii
+          "SHA256_FILE=$zip.sha256" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          # Résumé de job : de quoi épingler à la main si besoin.
+          $md = @"
+          ## Bundle publié
+
+          | | |
+          |---|---|
+          | Archive | ``$(Split-Path $zip -Leaf)`` |
+          | Taille exacte | ``$bytes`` octets |
+          | SHA-256 | ``$hash`` |
+
+          Pour épingler ces valeurs dans ``src/crush/kernel/bundle_download.py`` :
+
+          ``````
+          python scripts/pin_bundle.py $($env:GITHUB_REF_NAME)
+          ``````
+          "@
+          $md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Write-Host "SHA-256 : $hash"
+          Write-Host "Octets  : $bytes"
+
       - name: Créer la release + attacher le zip
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           generate_release_notes: true # CHANGELOG indexé par phase, pas par version
-          files: ${{ env.ZIP_PATH }}
+          files: |
+            ${{ env.ZIP_PATH }}
+            ${{ env.SHA256_FILE }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Parsers Bluetooth — sortie texte des outils système → list[dict] UI-shaped.
 

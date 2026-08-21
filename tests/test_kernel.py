@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Tests du Memory Kernel (CDC §6.1–§6.2) — schéma, CRUD, FTS5, atomicité, correction humaine."""
 

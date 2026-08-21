@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Installation/désinstallation des skills depuis le dépôt de catalogue."""
 

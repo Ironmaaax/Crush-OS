@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Pipeline d'ingestion : event → facts via LLM + réconciliation (CDC §6.4–§6.6).
 

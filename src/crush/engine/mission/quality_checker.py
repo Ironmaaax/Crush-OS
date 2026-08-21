@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """
 QualityChecker — vérifications automatiques de qualité post-étape et fin de projet.

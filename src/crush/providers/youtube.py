@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """youtube.py — Snapshot YouTube (Data API v3, clé seule) pour le briefing.
 

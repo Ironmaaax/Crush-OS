@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Les trois outils skills — jamais sondés en production parce qu'ils écrivent.
 

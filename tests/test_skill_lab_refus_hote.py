@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Le Skill Lab refuse d'executer une candidate hors conteneur, par defaut.
 

@@ -24,7 +24,21 @@ Actions sur **push d'un tag `vX.Y.Z`**. Plus de build manuel ni d'upload à la m
    Durée : ~15-25 min (téléchargement Python + deps + modèles + livekit).
 
 5. Vérifie la release sur GitHub : l'asset `crush-offline-windows-v0.3.3.zip`
-   (~700 MB) doit être présent.
+   (~700 MB) doit être présent, accompagné de son sidecar
+   `crush-offline-windows-v0.3.3.zip.sha256`.
+
+6. **Épingle l'empreinte**, sinon le téléchargement du bundle ne vérifie que la
+   taille — et une taille identique ne prouve rien sur 700 MB de binaires qui
+   seront exécutés chez l'utilisateur :
+
+   ```bash
+   python scripts/pin_bundle.py v0.3.3
+   git add src/crush/kernel/bundle_download.py
+   git commit -m "release: epingler l'empreinte du bundle v0.3.3"
+   ```
+
+   Le script lit la taille exacte dans l'API des releases et l'empreinte dans le
+   sidecar : aucun téléchargement des 700 MB. `--check` compare sans écrire.
 
 ## Important
 

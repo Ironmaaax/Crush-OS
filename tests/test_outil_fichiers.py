@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Outils read_file / find_files : bonne machine annoncée, périmètre tenu.
 

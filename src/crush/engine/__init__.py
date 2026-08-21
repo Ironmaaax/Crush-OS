@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """L2 — Engine : orchestration métier (RÈGLE 3 — n'importe que kernel).
 

@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Max Ea
 # Copyright (C) 2026 Maxime Song — modifications de ce fork
 # This file is part of CRUSH-OS,   .
- 
+
 
 from __future__ import annotations
 
@@ -36,10 +36,14 @@ BUNDLE_ZIP_URL = f"{BUNDLE_CDN_ROOT}/crush-offline-windows-{BUNDLE_RELEASE_VERSI
 # verification ligne ~185 fera echouer le telechargement jusqu'a ce qu'elle soit
 # remplacee par la taille reelle de ta propre release.
 BUNDLE_ZIP_BYTES = 657_929_168
-# Empreinte SHA-256 de bundle.zip. Vide = non verifiee, seule la taille l'est —
-# or une taille identique ne prouve rien sur le contenu, et l'archive contient un
-# venv Python et des binaires qui seront EXECUTES. Publier bundle.zip.sha256 a
-# cote de l'archive et coller la valeur ici suffit a activer la verification.
+# Empreinte de l'archive publiee. VIDE = non verifiee : seule la taille l'est, or
+# une taille identique ne prouve rien sur le contenu, et l'archive contient un venv
+# Python et des binaires qui seront EXECUTES sur la machine de l'utilisateur.
+#
+# Ne pas remplir a la main : le workflow publie un sidecar
+# `crush-offline-windows-<tag>.zip.sha256` a cote de l'archive, et
+# `python scripts/pin_bundle.py <tag>` fige ici la taille exacte et l'empreinte
+# relevees sur l'artefact reellement publie.
 BUNDLE_ZIP_SHA256 = ""
 
 _lock = threading.Lock()

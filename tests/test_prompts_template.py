@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Maxime Song
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Rendu des gabarits de prompt — `kernel/prompts.py`.
 
@@ -64,7 +64,7 @@ def test_placeholders_listes() -> None:
 def test_prompt_systeme_ne_contient_plus_de_nom_en_dur() -> None:
     """Garde-fou : aucun nom propre ne doit revenir dans le gabarit."""
     texte = (PROMPTS_DIR / "system_static.md").read_text(encoding="utf-8")
-    assert not re.search(r"\bBarth\b", texte), "« Max » est revenu en dur"
+    assert not re.search(r"\bMax\b", texte), "« Max » est revenu en dur"
     assert not re.search(r"\bCrush\b", texte), "« Crush » est revenu en dur"
 
 

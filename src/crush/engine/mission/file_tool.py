@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Max Ea
 # This file is part of CRUSH-OS,   .
- 
+
 
 """Outil fichiers sandboxé — toutes les opérations confinées au workspace du projet."""
 

@@ -1,7 +1,7 @@
 # Handoff Integration — DONE
 
 Date: 2026-05-07  
-Source: `/Users/barthEa/Downloads/handoff/`
+Source: `/Users/MaxEa/Downloads/handoff/`
 
 ---
 
