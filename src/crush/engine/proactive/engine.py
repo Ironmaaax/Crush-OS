@@ -233,7 +233,13 @@ class ProactiveEngine:
             initiative.priority, settings.push_notify_priority_min
         ):
             return
-        if not await self._push.pousser(texte):
+        # VALIDATE attend une reponse : on pousse la question ET le moyen d'y
+        # repondre. NOTIFY n'attend rien, un bouton y serait un faux choix.
+        if initiative.execution_mode == ExecutionMode.VALIDATE:
+            abouti = await self._push.pousser_decision(texte, initiative.id)
+        else:
+            abouti = await self._push.pousser(texte)
+        if not abouti:
             logger.warning("Initiative non poussee", initiative=initiative.title)
 
     async def _dispatch(self, initiative: Initiative) -> None:

@@ -4,17 +4,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Query, Request
-from loguru import logger as _log
 from pydantic import BaseModel
 
-from crush.capabilities.tools.gmail import send_gmail_draft
 from crush.engine.proactive.initiative_generator import InitiativeGenerator
-from crush.engine.proactive.schemas import InitiativeType
 from crush.engine.proactive.store import InitiativeStore
-from crush.kernel.settings import settings as _s
+from crush.interfaces.decision import traiter
 
 router = APIRouter()
 
@@ -70,55 +65,34 @@ async def get_initiatives() -> list[dict]:
 
 @router.post("/api/initiatives/{initiative_id}/approve")
 async def approve_initiative(initiative_id: str, request: Request) -> dict:
-    import asyncio
+    """Approuve une initiative. L'exécution vit dans `interfaces/decision`.
 
-    store = InitiativeStore()
-    init = store.get_by_id(initiative_id)
-    if not init:
+    Elle y a été extraite quand les boutons Telegram sont arrivés : deux
+    implémentations de « approuver », c'est un e-mail parti deux fois ou pas du
+    tout selon la porte utilisée.
+    """
+    resultat = await traiter(
+        initiative_id,
+        approuvee=True,
+        orchestrator=getattr(request.app.state, "orchestrator", None),
+    )
+    if not resultat.trouvee:
         raise HTTPException(404, "Initiative introuvable")
-
-    result: dict = {"status": "approved", "type": str(init.type)}
-
-    try:
-        if init.type == InitiativeType.DRAFT_RESPONSE:
-            msg_id = await send_gmail_draft(
-                draft_content=init.draft_content or "",
-                credentials_path=Path(_s.google_credentials_path),
-                token_path=Path(_s.google_token_path).parent / "google_gmail_token.json",
-            )
-            result["message_id"] = msg_id
-            _to = init.draft_content[:40] if init.draft_content else ""
-            _log.info(f"Initiative {initiative_id}: email envoyé", to=_to)
-
-        elif init.type == InitiativeType.AUTO_TASK:
-            orchestrator = getattr(request.app.state, "orchestrator", None)
-            if orchestrator:
-                mission = init.mission_description or init.action
-                asyncio.create_task(
-                    orchestrator.create_and_run(mission),
-                    name=f"initiative-{initiative_id[:8]}",
-                )
-                result["mission_launched"] = True
-                _log.info(f"Initiative {initiative_id}: mission lancée", mission=mission[:60])
-            else:
-                result["warning"] = "Orchestrateur non disponible"
-
-        else:
-            _log.info(f"Initiative {initiative_id} approuvée", type=init.type, title=init.title)
-
-    except Exception as e:
-        _log.error(f"Initiative approve error ({init.type}): {e}")
-        result["error"] = str(e)
-
-    store.update_status(initiative_id, "approved")
-    return result
+    reponse: dict = {"status": "approved", "detail": resultat.detail}
+    if resultat.deja_traitee:
+        reponse["status"] = resultat.statut_precedent
+        reponse["deja_traitee"] = True
+    if resultat.erreur:
+        reponse["error"] = resultat.erreur
+    return reponse
 
 
 @router.post("/api/initiatives/{initiative_id}/reject")
 async def reject_initiative(initiative_id: str) -> dict:
-
-    InitiativeStore().update_status(initiative_id, "rejected")
-    return {"status": "rejected"}
+    resultat = await traiter(initiative_id, approuvee=False)
+    if not resultat.trouvee:
+        raise HTTPException(404, "Initiative introuvable")
+    return {"status": "rejected", "detail": resultat.detail}
 
 
 @router.post("/api/initiatives/{initiative_id}/rectify")

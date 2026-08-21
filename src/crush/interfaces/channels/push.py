@@ -43,6 +43,24 @@ class CanalPoussant(Protocol):
     async def send_message(self, text: str) -> None: ...
 
 
+@runtime_checkable
+class CanalDecidant(Protocol):
+    """Canal capable de proposer un CHOIX, et pas seulement d'annoncer.
+
+    Une initiative `VALIDATE` attend une décision. Poussée en texte, elle laissait
+    la question sur le téléphone et la réponse sur l'ordinateur : il fallait ouvrir
+    le Command Center pour dire oui. Un canal qui sait afficher deux boutons ferme
+    la boucle là où la question est arrivée.
+
+    Capacité séparée de `CanalPoussant` pour la même raison que celui-ci est séparé
+    de `ChannelAdapter` : tous les canaux ne savent pas le faire, et un webhook
+    sortant n'a rien où accrocher un bouton. Ceux qui ne savent pas reçoivent le
+    texte — ils perdent le bouton, pas le message.
+    """
+
+    async def send_decision(self, text: str, initiative_id: str) -> None: ...
+
+
 @dataclass
 class DernierEnvoi:
     """Resultat de la derniere tentative reelle d'envoi."""
@@ -108,9 +126,35 @@ class PushCanaux:
         )
         return abouti
 
-    async def _envoyer(self, canal: CanalPoussant, texte: str) -> bool:
+    async def pousser_decision(self, texte: str, initiative_id: str) -> bool:
+        """Pousse une question, avec de quoi y répondre là où elle arrive.
+
+        Chaque canal reçoit ce qu'il sait afficher : des boutons s'il en est
+        capable, le texte sinon. On ne choisit pas UN canal — être joint sur
+        plusieurs, c'est vouloir décider depuis n'importe lequel.
+        """
+        global _dernier
+        if not self._canaux:
+            return False
+        resultats = await asyncio.gather(
+            *(self._envoyer(c, texte, initiative_id) for c in self._canaux)
+        )
+        abouti = any(resultats)
+        _dernier = DernierEnvoi(
+            horodatage=datetime.now(),
+            reussi=abouti,
+            erreur=None if abouti else self._derniere_erreur,
+        )
+        return abouti
+
+    async def _envoyer(
+        self, canal: CanalPoussant, texte: str, initiative_id: str | None = None
+    ) -> bool:
         try:
-            await canal.send_message(texte)
+            if initiative_id and isinstance(canal, CanalDecidant):
+                await canal.send_decision(texte, initiative_id)
+            else:
+                await canal.send_message(texte)
         except Exception as exc:  # noqa: BLE001 — un canal muet ne doit pas casser le cycle
             self._derniere_erreur = f"{_nom(canal)} : {exc}"
             logger.warning("Push impossible", canal=_nom(canal), erreur=str(exc))

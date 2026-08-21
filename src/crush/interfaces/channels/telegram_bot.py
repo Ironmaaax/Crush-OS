@@ -64,9 +64,10 @@ from crush.interfaces.channels.base import (  # noqa: E402
 from crush.kernel.settings import settings  # noqa: E402
 
 try:
-    from telegram import Update
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
     from telegram.ext import (
         Application,
+        CallbackQueryHandler,
         CommandHandler,
         ContextTypes,
         MessageHandler,
@@ -149,6 +150,8 @@ class TelegramChannel(ChannelAdapter):
         self._app.add_handler(CommandHandler("initiatives", self._cmd_initiatives))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
         self._app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message))
+        # Les appuis sur « Oui »/« Non » d'une initiative poussee.
+        self._app.add_handler(CallbackQueryHandler(self._on_decision, pattern=r"^init:"))
         self._app.add_error_handler(self._on_error)
 
         await self._app.initialize()
@@ -199,6 +202,36 @@ class TelegramChannel(ChannelAdapter):
                 text=text,
                 parse_mode="Markdown",
             )
+
+    async def send_decision(self, text: str, initiative_id: str) -> None:
+        """Pousse une question avec deux boutons pour y repondre.
+
+        Les boutons sont attaches AU message : pas d'ambiguite sur l'initiative
+        visee, meme si trois questions attendent. Une reponse en texte libre
+        (« oui ») aurait exige de deviner laquelle -- et de se tromper une fois
+        sur trois pour des actions qui envoient des e-mails.
+
+        `callback_data` est plafonne a 64 octets par Telegram. « init:oui: » plus
+        un identifiant tient largement, mais on tronque plutot que de laisser
+        l'API refuser silencieusement le clavier.
+        """
+        if not (self._app and self._owner_id):
+            return
+        court = initiative_id[:48]
+        clavier = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✓ Oui", callback_data=f"init:oui:{court}"),
+                    InlineKeyboardButton("✕ Non", callback_data=f"init:non:{court}"),
+                ]
+            ]
+        )
+        await self._app.bot.send_message(
+            chat_id=self._owner_id,
+            text=text,
+            parse_mode="Markdown",
+            reply_markup=clavier,
+        )
 
     # ── Handlers internes ─────────────────────────────────────────────────────
 
@@ -334,6 +367,63 @@ class TelegramChannel(ChannelAdapter):
             await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
         except Exception as e:  # noqa: BLE001
             await update.message.reply_text(f"❌ Erreur : {e}")
+
+    async def _on_decision(
+        self,
+        update: Update,  # type: ignore[name-defined]
+        context: ContextTypes.DEFAULT_TYPE,  # type: ignore[name-defined]
+    ) -> None:
+        """Applique la decision prise depuis le fil Telegram.
+
+        Passe par `interfaces.decision.traiter`, le meme chemin que le bouton du
+        Command Center : deux implementations de « approuver », ce serait un
+        e-mail parti deux fois ou pas du tout selon la porte utilisee.
+
+        Le message d'origine est REECRIT avec le resultat, et son clavier retire.
+        Sans ca, les boutons restent tapotables : on retape quand rien ne semble
+        se passer, et l'action repartirait -- c'est aussi pourquoi `traiter()`
+        refuse ce qui n'est plus en attente.
+        """
+        requete = update.callback_query
+        if requete is None:
+            return
+        # Toujours accuser reception : sans ca, le client Telegram laisse la
+        # petite roue tourner sur le bouton jusqu'a expiration.
+        await requete.answer()
+
+        if not self._is_owner(update):
+            await requete.edit_message_text("⛔ Accès non autorisé.")
+            return
+
+        morceaux = (requete.data or "").split(":", 2)
+        if len(morceaux) != 3:
+            return
+        _, verbe, initiative_id = morceaux
+        approuvee = verbe == "oui"
+
+        from crush.interfaces.decision import traiter
+
+        try:
+            resultat = await traiter(initiative_id, approuvee=approuvee)
+        except Exception as exc:  # noqa: BLE001 — un echec doit se lire dans le fil
+            logger.warning("Decision Telegram echouee", initiative=initiative_id, erreur=str(exc))
+            await requete.edit_message_reply_markup(reply_markup=None)
+            return
+
+        entete = "✓ Approuvée" if approuvee else "✕ Écartée"
+        if not resultat.trouvee:
+            entete = "⚠ Introuvable"
+        elif resultat.deja_traitee:
+            entete = "• Déjà traitée"
+
+        texte = (requete.message.text or "") if requete.message else ""
+        try:
+            await requete.edit_message_text(
+                texte + f"\n\n*{entete}* — {resultat.detail}",
+                parse_mode="Markdown",
+            )
+        except Exception:  # noqa: BLE001 — reecriture refusee : au moins retirer les boutons
+            await requete.edit_message_reply_markup(reply_markup=None)
 
     async def _cmd_help(
         self,
