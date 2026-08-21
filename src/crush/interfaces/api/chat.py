@@ -9,19 +9,11 @@ from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from livekit.api import (
-    AccessToken,
-    CreateAgentDispatchRequest,
-    CreateRoomRequest,
-    LiveKitAPI,
-    VideoGrants,
-)
 from pydantic import BaseModel
 
 from crush.engine.background.notifications import broadcast_event
 from crush.engine.background.worker import BackgroundTask
 from crush.engine.router import RouteEnum
-from crush.kernel.settings import settings
 from crush.providers.audio.tts import tts_engine
 
 router = APIRouter()
@@ -48,7 +40,11 @@ class ToolExecuteRequest(BaseModel):
 
 @router.post("/api/tools/execute")
 async def execute_tool(body: ToolExecuteRequest, request: Request) -> dict:
-    """Bridge générique — le voice agent LiveKit appelle les outils Crush via cet endpoint."""
+    """Bridge générique — un client programmatique exécute un outil Crush par HTTP.
+
+    Servait au process vocal LiveKit, supprimé ; reste utilisé par les clients
+    hors-process (agent de poste distant).
+    """
     registry = request.app.state.tool_registry
     result = await registry.call(body.tool, body.params)
     return {
@@ -153,46 +149,6 @@ async def voice_generate(body: VoiceGenerateRequest, request: Request) -> Stream
     )
 
 
-@router.get("/api/voice/token")
-async def get_voice_token(session_id: str | None = None) -> dict:  # noqa: ARG001
-    """Génère un token LiveKit et dispatche l'agent crush dans la room."""
-    import os
-    import uuid
-
-    api_key = os.getenv("LIVEKIT_API_KEY")
-    api_secret = os.getenv("LIVEKIT_API_SECRET")
-    livekit_url = os.getenv("LIVEKIT_URL")
-
-    room_name = f"crush-{uuid.uuid4().hex[:8]}"
-
-    async with LiveKitAPI(url=livekit_url, api_key=api_key, api_secret=api_secret) as lkapi:
-        await lkapi.room.create_room(CreateRoomRequest(name=room_name))
-        await lkapi.agent_dispatch.create_dispatch(
-            CreateAgentDispatchRequest(room=room_name, agent_name="crush")
-        )
-
-    # Identité du participant = prénom configuré (et plus "Max" en dur), visible
-    # dans les logs LiveKit. Slug minimal (minuscules, sans espaces) ; repli "user".
-    identity = (settings.user_firstname or "").strip().lower().replace(" ", "-") or "user"
-
-    token = (
-        AccessToken(api_key=api_key, api_secret=api_secret)
-        .with_identity(identity)
-        .with_name(settings.display_name)
-        .with_grants(
-            VideoGrants(
-                room_join=True,
-                room=room_name,
-                can_publish=True,
-                can_subscribe=True,
-            )
-        )
-        .to_jwt()
-    )
-
-    return {"token": token, "url": livekit_url}
-
-
 # ── Internal broadcast ────────────────────────────────────────────────────────
 
 
@@ -206,7 +162,7 @@ async def internal_broadcast(request: Request) -> dict:
 
 
 # ── Internal : proxy d'exécution des tools mémoire (process voix) ──────────────
-# Le process voix LiveKit appelle ces tools via HTTP plutôt que d'instancier son
+# Un client hors-process appelle ces tools par HTTP plutôt que d'instancier son
 # PROPRE modèle d'embeddings (~470 MB) : l'API a déjà le modèle chargé. On évite
 # ainsi de doubler la RAM (et le chargement lent au 1er appel) côté voix.
 # Restreint aux tools mémoire — pas d'exécution d'outils arbitraire via HTTP.

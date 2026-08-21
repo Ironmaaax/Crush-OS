@@ -54,14 +54,13 @@ dependencies = [
     "feedparser>=6.0.12",
     "yt-dlp>=2026.3.17",
     "numpy>=1.26.0",
-    # Voix — pipeline LiveKit : le navigateur publie son micro dans la room,
-    # l'agent la rejoint. Aucun périphérique audio requis côté serveur.
-    "livekit-agents[deepgram,silero]>=1.5.1",
-    "livekit-plugins-google>=1.5.1",
-    "livekit-plugins-elevenlabs>=1.5.1",
-    "livekit-plugins-openai>=1.5.1",
-    "livekit-plugins-anthropic>=1.5.1",
-    "livekit-api>=1.1.0",
+    # Voix — le navigateur pousse son micro sur `/ws/voice`, l'API transcrit,
+    # répond et renvoie l'audio. Pas de serveur média, pas de périphérique audio
+    # côté serveur : `httpx` suffit (cf. providers/audio/stt.py et tts.py).
+    #
+    # LiveKit a été retiré ici : il n'était plus utilisé par aucun chemin de code
+    # depuis le passage au WebSocket direct, mais restait installé — 11 paquets,
+    # plus `av` (67 Mo) tiré par `livekit-agents` et lui seul.
     # TTS local — ONNX, tourne sur ARM, génère un fichier (pas de carte son).
     "piper-tts>=1.2.0",
     # TTS en ligne — voix neuronales Microsoft, gratuit et sans clé. Voix par
@@ -72,6 +71,11 @@ dependencies = [
     "python-telegram-bot>=21.0",
     # Musique locale Linux : MPRIS via D-Bus (pur Python, sans binaire système)
     "jeepney>=0.8.0",
+    # Métriques machine (CPU/RAM/disque/batterie) — utilisé par
+    # `interfaces/api/system.py` et `config/devices.py`, sans garde d'import.
+    # N'était PAS déclaré : il arrivait gratuitement par `livekit-agents`. Le
+    # retrait de LiveKit l'a fait disparaître, et ces deux endpoints avec lui.
+    "psutil>=7.0.0",
 ]
 
 [project.optional-dependencies]
