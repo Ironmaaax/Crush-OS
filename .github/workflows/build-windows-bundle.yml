@@ -7,6 +7,12 @@ on:
   push:
     tags:
       - "v*"
+  # Déclenchement manuel : valider le build SANS publier. Sans ça, la seule façon
+  # d'éprouver ce workflow était de pousser un tag, donc de brûler un numéro de
+  # version à chaque tentative — et un tag qui échoue laisse une version sans
+  # release, ce qui est pire qu'inutile. Ici, aucune release n'est créée : voir la
+  # condition sur l'étape « Créer la release ».
+  workflow_dispatch:
 
 permissions:
   contents: write # créer la release + uploader l'asset
@@ -34,7 +40,30 @@ jobs:
       # runners, au moment précis (release) où on ne veut pas découvrir un échec.
       - name: Build offline bundle
         shell: pwsh
-        run: .\scripts\release\build_bundle.ps1
+        # La sortie du script est aussi remontée en `::error::` quand il tombe :
+        # les annotations d'un run sont lisibles sans droits admin sur le dépôt,
+        # les logs non. Sans ça, un échec de build ne dit rien d'autre que
+        # « exit code 1 » — au moment précis d'une release, c'est le pire endroit
+        # pour n'avoir aucun diagnostic.
+        run: |
+          $ErrorActionPreference = "Stop"
+          $journal = "build_bundle.log"
+          try {
+            & .\scripts\release\build_bundle.ps1 *>&1 | Tee-Object -FilePath $journal
+          } catch {
+            ($_ | Out-String) | Tee-Object -FilePath $journal -Append | Out-Host
+            if (Test-Path $journal) {
+              # UNE seule annotation multi-lignes, pas quarante : GitHub tronque
+              # au-delà d'un certain nombre d'annotations, et il garde les
+              # PREMIÈRES — on perdrait donc la fin, qui est justement la cause.
+              # `%0A` est le saut de ligne des commandes de workflow ; `%` doit
+              # être échappé avant, sinon un pourcentage du log casse l'encodage.
+              $queue = (Get-Content $journal -Tail 25) -join "`n"
+              $msg = $queue -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+              Write-Host "::error title=build_bundle (25 dernieres lignes)::$msg"
+            }
+            exit 1
+          }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -70,7 +99,14 @@ jobs:
       - name: Packager le zip
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
+          # Sur déclenchement manuel, `github.ref_name` est un nom de BRANCHE : on
+          # ne veut ni un « crush-offline-windows-main.zip », ni une release
+          # nommée « main ». Le build est alors étiqueté comme provisoire.
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $tag = "dev-" + $env:GITHUB_SHA.Substring(0, 7)
+          }
           $zip = "crush-offline-windows-$tag.zip"
           $top = "crush-OS"
           if (Test-Path $zip) { Remove-Item $zip -Force }
@@ -164,7 +200,10 @@ jobs:
           Write-Host "SHA-256 : $hash"
           Write-Host "Octets  : $bytes"
 
+      # Publier n'a de sens que sur un tag. Un déclenchement manuel sert à
+      # éprouver le build : il s'arrête ici, sans rien rendre public.
       - name: Créer la release + attacher le zip
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
