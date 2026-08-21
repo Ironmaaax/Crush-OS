@@ -186,6 +186,15 @@ install_unit crush-alerte@.service
 install_unit crush-sante.service
 install_unit crush-sante.timer
 
+# Partage WebDAV du miroir pour Obsidian. L'unité est POSÉE mais pas activée :
+# elle donne accès en lecture-écriture à tout ce que l'assistant sait de son
+# utilisateur, et cela ne doit pas s'allumer parce qu'on a lancé un installateur.
+# Elle s'active en connaissance de cause, par `bash scripts/webdav_obsidian.sh`,
+# qui génère aussi les identifiants. Une installation antérieure ayant déjà ses
+# identifiants est en revanche remise en route, sinon une réinstallation
+# couperait silencieusement la synchronisation du téléphone.
+install_unit crush-webdav.service
+
 # Drop-in et non réécriture de crush-api.service : ce dossier contient déjà
 # `docker-rootless.conf`, et réécrire l'unité principale risquerait de
 # l'orpheliner — cf. le commentaire dans alerte.conf.
@@ -198,6 +207,8 @@ chmod +x "$PROJECT_DIR/scripts/alerte.sh" "$PROJECT_DIR/scripts/sante.sh"
 sudo systemctl daemon-reload
 
 ENABLED_UNITS=(crush-api.service crush-sante.timer)
+# Déjà configuré une fois : on ne coupe pas ce qui marchait.
+[ -f "$PROJECT_DIR/.env.webdav" ] && ENABLED_UNITS+=(crush-webdav.service)
 
 sudo systemctl enable "${ENABLED_UNITS[@]}" >/dev/null 2>&1
 sudo systemctl restart "${ENABLED_UNITS[@]}"

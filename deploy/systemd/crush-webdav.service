@@ -1,0 +1,75 @@
+# Unité systemd — le miroir de la mémoire, servi en WebDAV pour Obsidian.
+#
+# POURQUOI UN SERVICE À PART
+#
+# Obsidian sur téléphone ne sait pas ouvrir un dossier distant : il lui faut un
+# coffre local, synchronisé avec quelque chose. Or Obsidian Sync ne relie que
+# des CLIENTS Obsidian entre eux, et il n'existe pas d'Obsidian sans interface —
+# la Pi ne peut donc pas en être un. Il faut qu'elle serve les fichiers par un
+# protocole que le greffon « Remotely Save » comprend, sur iOS comme sur Android :
+# WebDAV.
+#
+# POURQUOI PAS DANS L'API DE CRUSH
+#
+# WebDAV réclame PROPFIND, MKCOL, LOCK, DELETE et une sémantique d'ETag précise.
+# L'écrire dans FastAPI, c'est réimplémenter un protocole subtil sur le chemin
+# critique de l'assistant, et faire tomber la mémoire avec l'API en cas de bug.
+# `rclone serve webdav` le fait déjà, et son arrêt n'empêche pas Crush de
+# fonctionner : on perd la synchronisation, pas l'assistant.
+#
+# EXPOSITION
+#
+# Écoute sur 127.0.0.1 UNIQUEMENT. L'accès depuis le téléphone passe par
+# `tailscale serve --https=10000`, donc chiffré et limité au tailnet. Ce service
+# donne accès en LECTURE ET ÉCRITURE à tout ce que l'assistant sait de son
+# utilisateur : il n'a rien à faire sur une interface publique.
+#
+# Installée par `scripts/install_pi.sh`, qui substitue __CRUSH_DIR__ et
+# __CRUSH_USER__. Ne pas éditer la copie dans /etc/systemd/system.
+[Unit]
+Description=Miroir de la mémoire servi en WebDAV (Obsidian)
+Documentation=file://__CRUSH_DIR__/docs/obsidian.md
+After=network-online.target
+Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=exec
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+
+# Les identifiants viennent d'un fichier à 600, jamais de la ligne de commande :
+# les arguments d'un processus sont lisibles par tout le monde dans `ps`, son
+# environnement ne l'est que par son propriétaire et root. rclone accepte
+# RCLONE_USER et RCLONE_PASS comme équivalents de --user et --pass.
+EnvironmentFile=__CRUSH_DIR__/.env.webdav
+
+# --addr sur la boucle locale : voir « EXPOSITION » plus haut.
+ExecStart=/usr/bin/rclone serve webdav __CRUSH_DIR__/memory_data/mirror \
+          --addr 127.0.0.1:8002 \
+          --dir-cache-time 10s
+
+Restart=always
+RestartSec=5
+
+# ── Durcissement ─────────────────────────────────────────────────────────────
+# Bien plus serré que crush-api : ce service n'a qu'un seul dossier à servir et
+# n'exécute rien. ReadWritePaths le limite au miroir — une faille dans le
+# serveur WebDAV ne donne pas accès au reste de la machine, ni à la base SQLite
+# où vit réellement la mémoire.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=__CRUSH_DIR__/memory_data/mirror
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

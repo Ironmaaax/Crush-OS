@@ -11,6 +11,8 @@ wheels/
 
 # ── Environnement — clés API, JAMAIS committées ───────────────
 .env
+# Identifiants du partage WebDAV du miroir (cf. scripts/webdav_obsidian.sh).
+.env.webdav
 
 # ── Fichiers de spécifications / cahiers des charges ─────────
 CRUSH_*.md
