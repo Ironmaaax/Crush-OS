@@ -71,17 +71,48 @@ $uvExe = (Get-Command uv).Source
 Copy-Item $uvExe (Join-Path $binDir "uv.exe") -Force
 
 Write-Host "[5/6] Download ML models" -ForegroundColor Cyan
-if (-not (Test-Path "yolov8n.pt")) {
-    & $bundlePython -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+# Poids YOLO telecharges DIRECTEMENT, comme les voix Piper juste en dessous.
+# L'ancienne version instanciait `ultralytics.YOLO` pour declencher le
+# telechargement en effet de bord. Or l'extra `vision` n'est PAS installe dans le
+# bundle -- il tirerait torch, plusieurs Go dans une archive de 700 Mo -- donc
+# l'import echouait, et comme l'appel n'etait pas suivi d'un controle de code
+# retour (contrairement a toutes les autres etapes de ce script), l'echec
+# ressortait en « Cannot find path yolov8n.pt », qui ne designe pas la cause.
+$yoloTarget = Join-Path $modelsDir "yolov8n.pt"
+if (Test-Path "yolov8n.pt") {
+    # Cache local d'un poste de dev : on ne retelecharge pas.
+    Copy-Item "yolov8n.pt" $yoloTarget -Force
+} elseif (-not (Test-Path $yoloTarget)) {
+    $yoloUrl = "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt"
+    curl.exe -fL --retry 3 -o $yoloTarget $yoloUrl
+    if ($LASTEXITCODE -ne 0) { throw "yolov8n.pt download failed." }
+    $yoloSize = (Get-Item $yoloTarget).Length
+    if ($yoloSize -lt 3000000) {
+        throw "yolov8n.pt too small ($yoloSize bytes), download likely corrupted."
+    }
 }
-Copy-Item "yolov8n.pt" (Join-Path $modelsDir "yolov8n.pt") -Force
+if (-not (Test-Path $yoloTarget)) { throw "yolov8n.pt missing after model step." }
 
 $piperOnnx = Join-Path $piperDir "fr_FR-upmc-medium.onnx"
 $piperJson = "$piperOnnx.json"
 if (-not (Test-Path $piperOnnx)) {
+    # `-f` et les controles de taille ne sont pas du zele : sans `-f`, curl ecrit
+    # la page d'erreur HTML DANS le .onnx et rend 0. Le script continuerait, le
+    # workflow verifie l'existence du chemin et la trouverait -- on publierait
+    # donc un bundle de 700 Mo dont la synthese vocale est un fichier HTML.
     $baseUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/fr/fr_FR/upmc/medium"
-    curl.exe -L --silent -o $piperOnnx "$baseUrl/fr_FR-upmc-medium.onnx"
-    curl.exe -L --silent -o $piperJson "$baseUrl/fr_FR-upmc-medium.onnx.json"
+    curl.exe -fL --retry 3 --silent -o $piperOnnx "$baseUrl/fr_FR-upmc-medium.onnx"
+    if ($LASTEXITCODE -ne 0) { throw "piper onnx download failed." }
+    curl.exe -fL --retry 3 --silent -o $piperJson "$baseUrl/fr_FR-upmc-medium.onnx.json"
+    if ($LASTEXITCODE -ne 0) { throw "piper json download failed." }
+    $onnxSize = (Get-Item $piperOnnx).Length
+    if ($onnxSize -lt 10000000) {
+        throw "piper onnx too small ($onnxSize bytes), download likely corrupted."
+    }
+    $jsonSize = (Get-Item $piperJson).Length
+    if ($jsonSize -lt 1000) {
+        throw "piper json too small ($jsonSize bytes), download likely corrupted."
+    }
 }
 
 Write-Host "[6/6] Download livekit-server" -ForegroundColor Cyan
