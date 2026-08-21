@@ -47,6 +47,10 @@ class MessagingGateway:
 
     # ── Gestion des adaptateurs ───────────────────────────────────────────────
 
+    def adapters(self) -> list[ChannelAdapter]:
+        """Les canaux enregistres. Public : le push sortant doit les parcourir."""
+        return list(self._adapters.values())
+
     def register(self, adapter: ChannelAdapter) -> None:
         """Enregistre un adaptateur et lui injecte le callback de dispatch."""
         adapter.set_dispatch(self.dispatch)

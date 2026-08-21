@@ -27,6 +27,7 @@ import crush.interfaces.channels.telegram_bot as _tg_module
 from crush.interfaces.api.channels import router as channels_router
 from crush.interfaces.channels.discord_bot import DiscordChannel
 from crush.interfaces.channels.gateway import MessagingGateway
+from crush.interfaces.channels.push import PushCanaux
 from crush.interfaces.channels.telegram_bot import TelegramChannel
 from crush.kernel.connectivity import is_offline_mode
 
@@ -70,9 +71,10 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
         app.state.messaging_gateway = messaging_gw
         app.include_router(channels_router)
         await messaging_gw.start_all()
+        _brancher_push(container, messaging_gw.adapters())
         logger.info(
             "MessagingGateway démarré",
-            adapters=list(messaging_gw._adapters.keys()),
+            adapters=[a.platform.value for a in messaging_gw.adapters()],
         )
         return messaging_gw
 
@@ -80,6 +82,20 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
         telegram = TelegramChannel(gateway=container.gateway)
         _tg_module._telegram_instance = telegram
         asyncio.create_task(telegram.start(), name="telegram-bot")
+        _brancher_push(container, [telegram])
         logger.info("Canal Telegram démarré (mode legacy)")
 
     return None
+
+
+def _brancher_push(container: Container, canaux: list[object]) -> None:
+    """Donne au moteur proactif un moyen d'atteindre l'utilisateur.
+
+    Branche ICI et pas dans `bootstrap` : les canaux ne sont demarres qu'au
+    lifespan de l'app, bien apres la construction du container. Sans ce fil, les
+    initiatives qui demandent une decision n'atteignaient que les onglets ouverts.
+    """
+    moteur = getattr(container, "proactive_engine", None)
+    if moteur is None or not hasattr(moteur, "brancher_push"):
+        return
+    moteur.brancher_push(PushCanaux(canaux))

@@ -155,8 +155,12 @@ async def test_concurrency_blocks_overlap(tmp_path: Path) -> None:
 # ── Test 4 : événement proactif audité ────────────────────────────────────────
 
 
-def test_proactive_audit_event() -> None:
-    """ProactiveEngine._dispatch doit enregistrer un ProactiveAuditEvent consultable."""
+async def test_proactive_audit_event() -> None:
+    """ProactiveEngine._dispatch doit enregistrer un ProactiveAuditEvent consultable.
+
+    Asynchrone depuis que `_dispatch` pousse les initiatives vers les canaux de
+    messagerie : appele sans `await`, il rendait une coroutine et n'auditait rien.
+    """
     from crush.engine.background.notifications import NotificationQueue
     from crush.engine.proactive.engine import ProactiveEngine
 
@@ -192,7 +196,7 @@ def test_proactive_audit_event() -> None:
         execution_mode=ExecutionMode.NOTIFY,
     )
 
-    engine._dispatch(initiative)
+    await engine._dispatch(initiative)
 
     # Vérification de l'audit interne
     audit = engine.audit_events()

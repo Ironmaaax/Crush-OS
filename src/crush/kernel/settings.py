@@ -510,6 +510,25 @@ class Settings(BaseSettings):
     backup_keep: int = Field(
         default=7, description="Nombre d'archives conservees ; les plus anciennes sont purgees."
     )
+    # ── Push des initiatives proactives ───────────────────────
+    # Le moteur proactif produisait des decisions a prendre que rien ne poussait :
+    # il fallait ouvrir le Command Center pour les decouvrir.
+    push_proactive_enabled: bool = Field(
+        default=True,
+        description=(
+            "Pousse les initiatives vers les canaux de messagerie (Telegram...). "
+            "Sans ca, une initiative attend que vous ouvriez l'interface."
+        ),
+    )
+    push_notify_priority_min: str = Field(
+        default="high",
+        description=(
+            "Priorite minimale pour pousser une initiative de type NOTIFY : "
+            "high, medium ou low. Les VALIDATE sont toujours poussees, elles "
+            "demandent une decision. Tout pousser reviendrait a n'etre plus lu."
+        ),
+    )
+
     backup_copy_to: str = Field(
         default="",
         description=(

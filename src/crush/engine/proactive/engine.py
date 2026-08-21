@@ -24,6 +24,7 @@ from crush.engine.proactive.context_builder import ContextBuilder
 from crush.engine.proactive.initiative_generator import InitiativeGenerator
 from crush.engine.proactive.schemas import ExecutionMode, Initiative, Priority
 from crush.engine.proactive.store import InitiativeStore
+from crush.kernel.contracts import PushSortant
 from crush.kernel.settings import settings
 
 _AUDIT_MAXLEN = 200
@@ -43,6 +44,22 @@ class ProactiveAuditEvent:
     reasoning: str
     sources: list[str]
     decided_at: str  # ISO UTC
+
+
+_ORDRE_PRIORITE = {Priority.LOW: 0, Priority.MEDIUM: 1, Priority.HIGH: 2}
+
+
+def _atteint_le_seuil(priorite: Priority, seuil: str) -> bool:
+    """La priorite justifie-t-elle d'interrompre l'utilisateur ?"""
+    try:
+        minimum = _ORDRE_PRIORITE[Priority(seuil.strip().lower())]
+    except (ValueError, KeyError):
+        # Reglage illisible : on pousse. Pour cette fonction, etre bruyant sur une
+        # mauvaise configuration vaut mieux que taire silencieusement une decision
+        # attendue -- le bruit se remarque et se corrige, le silence non.
+        logger.warning("PUSH_NOTIFY_PRIORITY_MIN illisible, push force", valeur=seuil)
+        return True
+    return _ORDRE_PRIORITE.get(priorite, 0) >= minimum
 
 
 def _extract_sources(initiative: Initiative) -> list[str]:
@@ -78,6 +95,9 @@ class ProactiveEngine:
     ) -> None:
         self._notifications = notification_queue
         self._broadcast_event = broadcast_event
+        # Branche apres coup par interfaces/channels/setup.py : les canaux ne sont
+        # demarres qu'au lifespan de l'app, bien apres bootstrap.build().
+        self._push: PushSortant | None = None
         self._interval = interval_minutes * 60
         self._builder = builder
         self._generator = generator
@@ -171,7 +191,7 @@ class ProactiveEngine:
                 self._store.save(initiative)
 
             for initiative in initiatives:
-                self._dispatch(initiative)
+                await self._dispatch(initiative)
 
             high_count = sum(1 for i in initiatives if i.priority == Priority.HIGH)
             logger.info(
@@ -193,7 +213,30 @@ class ProactiveEngine:
             logger.error(f"ProactiveEngine cycle error: {e}")
             return []
 
-    def _dispatch(self, initiative: Initiative) -> None:
+    def brancher_push(self, push: PushSortant) -> None:
+        """Donne au moteur un moyen d'atteindre l'utilisateur de lui-meme."""
+        self._push = push
+        logger.info("Moteur proactif : push sortant branche", disponible=push.disponible())
+
+    async def _pousser(self, initiative: Initiative, texte: str) -> None:
+        """Pousse vers les canaux quand ca merite d'interrompre, pas a chaque cycle.
+
+        VALIDATE part toujours : elle demande une DECISION, et sans push elle
+        attend qu'on ouvre le Command Center. NOTIFY ne part qu'au-dessus du seuil
+        de priorite : elle a deja un chemin qui fonctionne -- la file de
+        notifications, servie a la prochaine conversation -- et tout pousser
+        reviendrait a n'etre plus lu du tout.
+        """
+        if self._push is None or not settings.push_proactive_enabled:
+            return
+        if initiative.execution_mode == ExecutionMode.NOTIFY and not _atteint_le_seuil(
+            initiative.priority, settings.push_notify_priority_min
+        ):
+            return
+        if not await self._push.pousser(texte):
+            logger.warning("Initiative non poussee", initiative=initiative.title)
+
+    async def _dispatch(self, initiative: Initiative) -> None:
         """Dispatche une initiative selon son mode d'exécution."""
         audit = ProactiveAuditEvent(
             event_id=f"aud_{uuid.uuid4().hex[:8]}",
@@ -222,6 +265,7 @@ class ProactiveEngine:
                 f"{initiative.title} — {initiative.action}"
             )
             self._notifications.add(msg)
+            await self._pousser(initiative, msg)
             logger.info(f"ProactiveEngine NOTIFY: {initiative.title}")
 
         elif initiative.execution_mode == ExecutionMode.VALIDATE:
@@ -241,5 +285,12 @@ class ProactiveEngine:
                         "created_at": initiative.created_at.isoformat(),
                     },
                 }
+            )
+            # C'est LE cas qui se perdait : diffuse aux seuls clients connectes,
+            # donc a personne la plupart du temps.
+            await self._pousser(
+                initiative,
+                f"*{initiative.title}*\n{initiative.action}\n\n"
+                f"Décision attendue. {initiative.reasoning or ''}".strip(),
             )
             logger.info(f"ProactiveEngine VALIDATE: {initiative.title}")

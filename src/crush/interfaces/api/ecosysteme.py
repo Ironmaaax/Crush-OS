@@ -24,6 +24,7 @@ pire qu'une page vide, parce qu'on cesse de vérifier.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -257,6 +258,7 @@ def _autonomie() -> list[dict]:
             "" if docker else "Installer Docker et mettre DOCKER_ENABLED=true.",
             "autonomie",
         ),
+        _initiatives_poussees(),
         _maillon(
             "Postes pilotables",
             _OK if registry.list_agents() else _ABSENT,
@@ -267,6 +269,47 @@ def _autonomie() -> list[dict]:
             "autonomie",
         ),
     ]
+
+
+def _initiatives_poussees() -> dict:
+    """Une initiative qui demande une décision peut-elle t'atteindre ?
+
+    Le moteur produisait des décisions à prendre diffusées aux seuls clients
+    WebSocket connectés : elles dormaient dans le Command Center jusqu'à ce qu'on
+    pense à l'ouvrir. Ce maillon existe pour que l'absence de canal se voie.
+
+    Les canaux se règlent par variable d'environnement et non par `Settings` —
+    `interfaces/channels/setup.py` les lit ainsi. On reste cohérent avec la
+    source de vérité plutôt qu'avec le style du fichier.
+    """
+    if not settings.push_proactive_enabled:
+        return _maillon(
+            "Initiatives poussées",
+            _DEGRADE,
+            "désactivé — une décision attendue patiente jusqu'à ta prochaine visite",
+            "Mettre PUSH_PROACTIVE_ENABLED=true.",
+            "autonomie",
+        )
+    canal = any(
+        os.getenv(v, "false").lower() == "true"
+        for v in ("TELEGRAM_ENABLED", "MESSAGING_GATEWAY_ENABLED")
+    )
+    if not canal:
+        return _maillon(
+            "Initiatives poussées",
+            _DEGRADE,
+            "aucun canal — les initiatives attendent que tu ouvres l'interface",
+            "Activer TELEGRAM_ENABLED et renseigner son owner.",
+            "autonomie",
+        )
+    return _maillon(
+        "Initiatives poussées",
+        _OK,
+        f"décisions toujours poussées, notifications à partir de "
+        f"« {settings.push_notify_priority_min} »",
+        "",
+        "autonomie",
+    )
 
 
 def _garde_fous() -> list[dict]:

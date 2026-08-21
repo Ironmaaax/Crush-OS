@@ -511,3 +511,22 @@ class MemoryBackup(Protocol):
 
     async def sauvegarder(self) -> ResultatSauvegarde: ...
     def age_heures(self) -> float | None: ...
+
+
+@runtime_checkable
+class PushSortant(Protocol):
+    """Pousse un message vers l'utilisateur sans qu'il ait rien a ouvrir.
+
+    Utilise par `engine/proactive/engine.py`. Les initiatives VALIDATE -- celles
+    qui demandent une DECISION -- etaient diffusees aux seuls clients WebSocket
+    connectes. Sur une machine allumee en permanence et consultee depuis un
+    telephone, une decision demandee a 8 h n'atteignait personne : elle dormait
+    dans le Command Center jusqu'a ce qu'on pense a l'ouvrir.
+
+    L'engine n'a pas le droit d'importer interfaces (REGLE 3) : la dependance est
+    branchee apres coup par `interfaces/channels/setup.py`, une fois les canaux
+    demarres -- ils n'existent pas encore quand bootstrap construit le moteur.
+    """
+
+    async def pousser(self, texte: str) -> bool: ...
+    def disponible(self) -> bool: ...
