@@ -29,6 +29,21 @@ from crush.interfaces.channels.push import CanalDecidant, PushCanaux
 from crush.kernel.schemas import ExecutionMode, Initiative, Priority
 
 
+@pytest.fixture(autouse=True)
+def _sans_heures_de_silence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neutralise la plage de silence pour TOUS les tests de ce fichier.
+
+    Sans ca, ces tests passaient l'apres-midi et echouaient la nuit : la plage
+    par defaut est 23:00-07:00, et une notification y est retenue. Un test qui
+    depend de l'heure a laquelle on le lance ne prouve rien -- et fait perdre du
+    temps a chercher une regression qui n'existe pas. Les tests qui visent la
+    plage elle-meme la posent explicitement.
+    """
+    monkeypatch.setattr(
+        "crush.engine.proactive.engine.settings.push_heures_silence", "", raising=False
+    )
+
+
 class _MagasinFactice:
     """Reproduit `InitiativeStore` sans toucher au disque."""
 

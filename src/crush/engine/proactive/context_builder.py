@@ -39,6 +39,11 @@ class WorldState:
     news_summary: str = ""
     crush_summary: str = ""
     weather_summary: str = ""
+    # Ou il est, et donc ce qui a du sens de proposer : « je te l'affiche »
+    # n'a aucun sens s'il n'est pas devant un clavier, et une suggestion qui
+    # suppose qu'il est joignable alors qu'aucun appareil ne l'est arrive dans
+    # le vide. Vide quand on ne sait pas -- jamais devine.
+    presence_summary: str = ""
 
     cross_domain_connections: list[str] = field(default_factory=list)
     tensions: list[str] = field(default_factory=list)
@@ -72,7 +77,12 @@ class ContextBuilder:
         self,
         calendar_tool: CalendarReadTool,
         notion_tool: NotionReadTool,
+        presence: object | None = None,
     ) -> None:
+        # Injectee et non importee : `providers/presence.py` est en L1, et la
+        # REGLE 3 interdit a l'engine d'importer providers. Optionnelle : sans
+        # elle le contexte est simplement muet sur ce point, pas faux.
+        self._presence = presence
         self._collectors = [
             EmailCollector(),
             CalendarCollector(calendar_tool=calendar_tool),
@@ -82,6 +92,22 @@ class ContextBuilder:
             WeatherCollector(),
             HomeAssistantCollector(),  # ← NOUVEAU : Intégration Home Assistant proactive
         ]
+
+    async def _resumer_presence(self) -> str:
+        """Une phrase, ou rien. Jamais une supposition.
+
+        Un echec de mesure rend la chaine vide plutot qu'un « absent » : le
+        generateur d'initiatives lirait « absent » comme un fait, et proposerait
+        de differer des choses sur la base d'une commande qui n'a pas repondu.
+        """
+        if self._presence is None:
+            return ""
+        try:
+            etat = await self._presence.etat()  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001 — le contexte se passe de ce champ
+            logger.warning("Presence illisible", error=str(exc))
+            return ""
+        return etat.resume() if etat.erreur is None or etat.au_poste else ""
 
     async def build(self) -> WorldState:
         """Lance tous les collecteurs en parallèle et construit l'état du monde."""
@@ -115,6 +141,7 @@ class ContextBuilder:
             collection.by_type(ItemType.MISSION) + collection.by_type(ItemType.MEMORY)
         )
         state.cross_domain_connections = self._detect_connections(collection)
+        state.presence_summary = await self._resumer_presence()
 
         logger.info(
             f"ContextBuilder: {len(all_items)} items collectés, "

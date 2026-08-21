@@ -28,7 +28,12 @@
 
 param(
     [switch]$Retirer,
-    [switch]$Etat
+    [switch]$Etat,
+    # Laisse l'agent dire sur quoi tu travailles (titres des fenetres, jamais une
+    # image). Volontairement un choix a faire, pas un defaut : le drapeau existe
+    # cote agent pour que cette capacite ne s'active pas par inadvertance, et le
+    # reproduire ici garderait le meme sens.
+    [switch]$Ecran
 )
 
 $ErrorActionPreference = 'Stop'
@@ -171,11 +176,13 @@ On Error GoTo 0
 ' vide jusqu'a 8 Ko accumules -- donc vide precisement quand on vient y
 ' chercher pourquoi l'agent ne s'est pas connecte. Meme raison que le
 ' PYTHONUNBUFFERED=1 de l'unite systemd de la Pi.
-cmd = "cmd /c """"__PYTHON__"" -u ""__AGENT__"" > ""__LOG__"" 2>&1"""
+cmd = "cmd /c """"__PYTHON__"" -u ""__AGENT__""__DRAPEAUX__ > ""__LOG__"" 2>&1"""
 shell.Run cmd, 0, False
 '@
 
-$vbsContenu = $modele.Replace('__PYTHON__', $Python).Replace('__AGENT__', $Agent).Replace('__LOG__', $Log)
+$drapeaux = ''
+if ($Ecran) { $drapeaux = ' --autoriser-ecran' }
+$vbsContenu = $modele.Replace('__PYTHON__', $Python).Replace('__AGENT__', $Agent).Replace('__LOG__', $Log).Replace('__DRAPEAUX__', $drapeaux)
 # ASCII : un VBS enregistre en UTF-8 avec BOM fait echouer wscript sur un
 # « caractere invalide » a la premiere ligne. Les commentaires sont donc sans
 # accents, et l'encodage force.
@@ -209,6 +216,8 @@ if (Test-Path $Log) {
 
 Write-Host ""
 Write-Host "  L'agent demarrera desormais a chaque ouverture de session."
+if ($Ecran) { Write-Host "  Lecture de l'ecran ACTIVEE (titres des fenetres)." }
+else { Write-Host "  Lecture de l'ecran desactivee. Pour l'activer : relancer avec -Ecran." }
 Write-Host "  Journal : $Log  (le precedent : $Log.1)"
 Write-Host "  Pour retirer : powershell -ExecutionPolicy Bypass -File scripts\agent_pc_autostart.ps1 -Retirer"
 Write-Host ""

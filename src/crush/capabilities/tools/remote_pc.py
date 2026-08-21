@@ -26,9 +26,13 @@ from crush.kernel.remote_agents import registry
 # expliquer pourquoi une action attendue n'est pas proposée.
 _ACTIONS_CONNUES: dict[str, str] = {
     "status": "état de la machine (nom, système, CPU, mémoire, batterie)",
+    "screen": (
+        "sur quoi il travaille en ce moment — titres des fenêtres ouvertes, "
+        "pas une capture d'écran"
+    ),
     "volume_set": 'règle le volume — params {"level": 0.0 à 1.0}',
     "volume_mute": "coupe ou rétablit le son",
-    "app_launch": 'lance une application — params {"name": "Spotify"}',
+    "app_launch": 'lance une application — params {"name": "Firefox"}',
     "app_quit": 'ferme une application — params {"name": "Spotify"}',
     "lock": "verrouille la session",
     "sleep": "met la machine en veille",
@@ -43,6 +47,11 @@ _ACTIONS_CONNUES: dict[str, str] = {
 # que d'expliquer l'absence.
 _ACTIONS_SENSIBLES = frozenset({"shutdown", "sleep", "app_quit"})
 
+# `screen` a son propre drapeau cote agent (`--autoriser-ecran`), distinct des
+# sensibles : celles-la CASSENT quelque chose, celle-ci RACONTE quelque chose.
+# Les melanger obligerait a accepter d'etre observe pour obtenir l'extinction.
+_ACTIONS_ECRAN = frozenset({"screen"})
+
 _COMMENT_CONNECTER = (
     "Sur la machine à piloter :\n"
     "  1. pip install websockets\n"
@@ -51,14 +60,20 @@ _COMMENT_CONNECTER = (
     "  3. python scripts/agent_pc.py                (laisser tourner : il se "
     "reconnecte seul)\n"
     "Ajouter --autoriser-sensibles à la dernière commande pour permettre "
-    "l'extinction, la veille et la fermeture d'applications."
+    "l'extinction, la veille et la fermeture d'applications, et --autoriser-ecran "
+    "pour qu'il puisse dire sur quoi vous travaillez."
 )
 
 
 def _catalogue_pour_schema() -> str:
     lignes = []
     for nom, aide in _ACTIONS_CONNUES.items():
-        suffixe = " [sensible]" if nom in _ACTIONS_SENSIBLES else ""
+        if nom in _ACTIONS_SENSIBLES:
+            suffixe = " [sensible]"
+        elif nom in _ACTIONS_ECRAN:
+            suffixe = " [ecran]"
+        else:
+            suffixe = ""
         lignes.append(f"{nom} : {aide}{suffixe}")
     return " | ".join(lignes)
 
@@ -73,6 +88,9 @@ class RemotePCTool(Tool):
         "verrouiller, mettre en veille, éteindre, connaître son état. "
         "À utiliser dès que la demande vise « mon PC », « mon ordi », ou une action "
         "qui n'a de sens que sur la machine de l'utilisateur. "
+        "Cet outil ne fait PAS jouer de musique : mettre un morceau, un artiste ou "
+        "une playlist « sur mon PC » designe un appareil de lecture Spotify et passe "
+        "par spotify_control, meme quand la demande nomme l'ordinateur. "
         "Appeler d'abord sans argument pour connaître les postes connectés et leurs "
         "actions disponibles. Cela suppose que l'agent scripts/agent_pc.py tourne sur "
         "cette machine ; sinon l'outil explique comment le lancer."

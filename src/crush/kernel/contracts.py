@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -101,6 +102,21 @@ class MemoryStore(Protocol):
 
     def get_event(self, event_id: str) -> Event | None: ...
     def count_events(self) -> int: ...
+
+    # Lecture par periode. La table `events` etait indexee sur `created_at`
+    # depuis le premier jour, et rien ne permettait de s'en servir : « qu'est-ce
+    # que j'ai fait mardi ? » n'avait pas de reponse.
+    def list_events_between(
+        self,
+        debut: datetime,
+        fin: datetime,
+        limit: int = ...,
+        types_exclus: tuple[str, ...] = ...,
+    ) -> list[Event]: ...
+
+    def list_facts_seen_between(
+        self, debut: datetime, fin: datetime, limit: int = ...
+    ) -> list[Fact]: ...
 
     # Facts
     def insert_fact(self, fact: Fact) -> None: ...

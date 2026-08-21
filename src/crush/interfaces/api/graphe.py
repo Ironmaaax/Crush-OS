@@ -305,3 +305,32 @@ async def lire_le_graphe(request: Request) -> dict[str, Any]:
         "isoles": isoles,
         "total": {"noeuds": len(noeuds), "liens": len(g.liens)},
     }
+
+
+# ── Où il est ─────────────────────────────────────────────────────────────────
+#
+# Placé ici plutôt que dans un module à part : c'est trois lignes, et la même
+# question que le graphe — de quoi cet assistant est-il fait, et qui est là.
+
+
+@router.get("/api/presence")
+async def lire_la_presence(request: Request) -> dict[str, Any]:
+    """Ce qu'on sait de sa joignabilité, et ce qu'on ne sait pas.
+
+    `a_la_maison` reste `null` tant que Home Assistant n'est pas branché : le
+    tailnet dit qu'un appareil est CONNECTÉ, pas où il se trouve. Un téléphone
+    en ligne l'est aussi bien dans le salon que dans un train.
+    """
+    presence = getattr(request.app.state, "presence", None)
+    if presence is None:
+        raise HTTPException(503, "Mesure de présence non disponible.")
+    etat = await presence.etat()
+    return {
+        "joignable": etat.joignable,
+        "au_poste": etat.au_poste,
+        "a_la_maison": etat.a_la_maison,
+        "resume": etat.resume(),
+        "appareils": etat.appareils,
+        "mesure_le": etat.mesure_le.isoformat() if etat.mesure_le else None,
+        "erreur": etat.erreur,
+    }

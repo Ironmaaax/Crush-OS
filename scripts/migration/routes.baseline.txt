@@ -73,6 +73,7 @@ GET     /api/music/provider-status
 GET     /api/music/status
 GET     /api/ollama/models
 GET     /api/permissions
+GET     /api/presence
 GET     /api/presets
 GET     /api/proactive/initiatives
 GET     /api/proactive/status

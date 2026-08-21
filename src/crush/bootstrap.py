@@ -45,6 +45,7 @@ from crush.capabilities.tools.cli import CLIRunnerTool, ExecuteCLITool
 from crush.capabilities.tools.filesystem import FindFilesTool, ReadFileTool
 from crush.capabilities.tools.gmail import GmailListTool, send_gmail_draft
 from crush.capabilities.tools.initiatives import InitiativesTool
+from crush.capabilities.tools.journal import MemoryJournalTool
 from crush.capabilities.tools.memory import (
     CrossSessionRecallTool,
     MemoryLoadTopicTool,
@@ -95,6 +96,7 @@ from crush.kernel.events import (
     NotificationRequested,
 )
 from crush.kernel.paths import CONFIG_DIR, MEMORY_DATA_DIR, SAUVEGARDES_DIR
+from crush.kernel.remote_agents import registry as registre_agents
 from crush.kernel.settings import Settings
 from crush.kernel.settings import settings as _default_settings
 from crush.providers.audio.stt import SpeechToText, create_stt
@@ -119,6 +121,7 @@ from crush.providers.memory.search import FTSIndex, VectorIndex
 from crush.providers.memory.sessions import SessionStore
 from crush.providers.memory.topics import TopicStore
 from crush.providers.memory.user_model import UserModel
+from crush.providers.presence import Presence
 
 
 @dataclass
@@ -146,6 +149,7 @@ class Container:
     # Consignes ecrites a la main (Obsidian ou page Coffre). Expose pour que
     # l'API puisse declencher une passe sans attendre le planificateur.
     boite_memoire: BoiteReception
+    presence: Presence
     user_model: UserModel
 
     # ── Providers L1 — LLM ─────────────────────────────────────────────────
@@ -331,6 +335,9 @@ def build(
         MemoryTopicWriteTool(vector_index=vector_index),
         MemoryLoadTopicTool(topic_store=topic_store),
         MemorySearchTool(vector_index=vector_index),
+        # La memoire sur l'axe du temps. `memory_search` cherche par SUJET et
+        # ignore les dates ; celui-ci repond a « qu'est-ce que j'ai fait mardi ».
+        MemoryJournalTool(kernel=memory_kernel),
         SpotifyTool(),
         GmailListTool(credentials_path=_google_creds, token_path=_gmail_token),
         ExecutePresetTool(tool_registry=tool_registry, tts_engine=tts_engine),
@@ -509,6 +516,10 @@ def build(
         budget_guard=budget,
         skill_lifecycle=skill_lifecycle,
     )
+    # Ou il est, et donc ce qui a du sens de proposer. Lit le tailnet et le
+    # registre des agents ; ne devine jamais ce qu'il ne peut pas constater.
+    presence = Presence(registre_agents=registre_agents)
+
     proactive_engine = ProactiveEngine(
         notification_queue=notifications,
         broadcast_event=proactive_queue.broadcast_event,
@@ -613,6 +624,7 @@ def build(
         memory_ingest=memory_ingest,
         memory_mirror=memory_mirror,
         boite_memoire=boite_memoire,
+        presence=presence,
         user_model=user_model,
         # Providers L1 — LLM
         llm=llm,

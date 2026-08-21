@@ -15,7 +15,7 @@ import uuid
 from collections import deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 from loguru import logger
 
@@ -47,6 +47,34 @@ class ProactiveAuditEvent:
 
 
 _ORDRE_PRIORITE = {Priority.LOW: 0, Priority.MEDIUM: 1, Priority.HIGH: 2}
+
+
+def _dans_le_silence(maintenant: time, plage: str) -> bool:
+    """Sommes-nous dans la plage de silence ? Une plage illisible ne bâillonne rien.
+
+    Le sens de l'erreur est l'inverse de celui de `_atteint_le_seuil` : là, une
+    valeur illisible POUSSE, parce que le bruit se remarque et se corrige tandis
+    que le silence ne se remarque pas. Ici, une plage illisible ne doit pas faire
+    taire l'assistant pour la même raison — une faute de frappe dans un réglage
+    ne doit jamais avoir pour effet de perdre des messages.
+    """
+    plage = (plage or "").strip()
+    if not plage:
+        return False
+    try:
+        debut_txt, fin_txt = plage.split("-", 1)
+        h1, m1 = (int(x) for x in debut_txt.strip().split(":", 1))
+        h2, m2 = (int(x) for x in fin_txt.strip().split(":", 1))
+        debut, fin = time(h1, m1), time(h2, m2)
+    except (ValueError, TypeError):
+        logger.warning("Plage d'heures de silence illisible — ignoree", plage=plage)
+        return False
+    if debut == fin:
+        return False
+    # La plage enjambe minuit dans le cas usuel (23:00-07:00) : deux intervalles.
+    if debut < fin:
+        return debut <= maintenant < fin
+    return maintenant >= debut or maintenant < fin
 
 
 def _atteint_le_seuil(priorite: Priority, seuil: str) -> bool:
@@ -233,6 +261,24 @@ class ProactiveEngine:
             initiative.priority, settings.push_notify_priority_min
         ):
             return
+
+        # Heures de silence. Ce qui n'a rien d'urgent attend le matin : le push
+        # marche, et c'est justement le probleme — ce qui sonne la nuit finit par
+        # etre coupe, et l'alerte utile part avec le reste. L'initiative n'est PAS
+        # perdue, elle reste dans la file servie a la prochaine conversation.
+        if _dans_le_silence(datetime.now().time(), settings.push_heures_silence):
+            urgent = (
+                initiative.execution_mode == ExecutionMode.VALIDATE
+                and initiative.priority == Priority.HIGH
+                and settings.push_silence_laisse_passer_urgent
+            )
+            if not urgent:
+                logger.info(
+                    "Initiative retenue jusqu'au matin",
+                    initiative=initiative.title,
+                    plage=settings.push_heures_silence,
+                )
+                return
         # VALIDATE attend une reponse : on pousse la question ET le moyen d'y
         # repondre. NOTIFY n'attend rien, un bouton y serait un faux choix.
         if initiative.execution_mode == ExecutionMode.VALIDATE:

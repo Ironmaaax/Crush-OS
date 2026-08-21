@@ -217,6 +217,60 @@ class MemoryKernel:
             conn.commit()
         return evt
 
+    def list_events_between(
+        self,
+        debut: datetime,
+        fin: datetime,
+        limit: int = 200,
+        types_exclus: tuple[str, ...] = (),
+    ) -> list[Event]:
+        """Les événements d'une période, du plus ancien au plus récent.
+
+        La table `events` porte un index sur `created_at` depuis toujours, et
+        aucune méthode ne permettait de s'en servir : on ne pouvait lire un
+        événement que par son identifiant. Le journal de ce que l'assistant a
+        vécu était donc là, indexé, et inatteignable — « qu'est-ce que j'ai fait
+        mardi ? » n'avait pas de réponse.
+
+        Ordre chronologique et non l'inverse : on relit une journée dans le sens
+        où elle s'est déroulée.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE created_at >= ? AND created_at < ? "
+                "ORDER BY created_at ASC LIMIT ?",
+                (debut.isoformat(), fin.isoformat(), max(1, limit)),
+            ).fetchall()
+        evenements = [self._row_to_event(r) for r in rows]
+        if types_exclus:
+            evenements = [e for e in evenements if e.type not in types_exclus]
+        return evenements
+
+    def list_facts_seen_between(
+        self, debut: datetime, fin: datetime, limit: int = 100
+    ) -> list[Fact]:
+        """Les faits appris OU revus dans la période.
+
+        `last_seen_at` et pas seulement `created_at` : un souvenir ancien reconfirmé
+        mardi fait partie de ce dont on a parlé mardi, alors qu'il n'a pas été
+        appris ce jour-là. Ne rendre que les créations donnerait une journée
+        artificiellement vide dès qu'on a surtout parlé de choses déjà sues.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM facts WHERE (last_seen_at >= ? AND last_seen_at < ?) "
+                "OR (created_at >= ? AND created_at < ?) "
+                "ORDER BY last_seen_at ASC LIMIT ?",
+                (
+                    debut.isoformat(),
+                    fin.isoformat(),
+                    debut.isoformat(),
+                    fin.isoformat(),
+                    max(1, limit),
+                ),
+            ).fetchall()
+        return [self._row_to_fact(r) for r in rows]
+
     def get_event(self, event_id: str) -> Event | None:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()

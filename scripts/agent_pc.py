@@ -275,6 +275,104 @@ def status(**_: object) -> tuple[bool, str]:
     return True, " · ".join(infos)
 
 
+# ── Écran ────────────────────────────────────────────────────────────────────
+
+
+def _fenetres_windows() -> tuple[str, list[str]]:
+    """Titre de la fenêtre au premier plan, et titres des autres fenêtres visibles.
+
+    `ctypes` plutôt que PowerShell : la première version passait par un
+    `Add-Type` de C# embarqué dans une commande PowerShell, illisible et fragile
+    au moindre échappement. L'agent est du Python qui tourne déjà sur la machine,
+    `ctypes` est dans la bibliothèque standard, et il n'y a rien à installer.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    tampon = ctypes.create_unicode_buffer(512)
+
+    def titre(handle: int) -> str:
+        if not user32.IsWindowVisible(handle):
+            return ""
+        if user32.GetWindowTextW(handle, tampon, 512) <= 0:
+            return ""
+        return tampon.value.strip()
+
+    avant = titre(user32.GetForegroundWindow())
+
+    autres: list[str] = []
+    signature = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def visiter(handle: int, _param: int) -> bool:
+        t = titre(handle)
+        if t:
+            autres.append(t)
+        return True
+
+    user32.EnumWindows(signature(visiter), 0)
+    return avant, autres
+
+
+def _fenetre_macos() -> tuple[str, list[str]]:
+    ok, sortie = _run(
+        [
+            "osascript",
+            "-e",
+            'tell application "System Events" to get name of first application process '
+            "whose frontmost is true",
+        ]
+    )
+    return (sortie.strip() if ok else ""), []
+
+
+def _fenetre_linux() -> tuple[str, list[str]]:
+    if not shutil.which("xdotool"):
+        return "", []
+    ok, sortie = _run(["xdotool", "getactivewindow", "getwindowname"])
+    return (sortie.strip() if ok else ""), []
+
+
+def screen(**_: object) -> tuple[bool, str]:
+    """Sur quoi il travaille — les TITRES des fenêtres, pas une image.
+
+    Choix délibéré. Une capture d'écran répondrait à la même question en
+    transmettant tout ce qui traîne à l'écran : une conversation privée, un mot
+    de passe affiché, un document sans rapport. Les titres suffisent à savoir
+    qu'on est dans VS Code sur tel fichier ou dans le navigateur sur telle page,
+    et ce qui n'est pas transmis ne peut pas fuiter.
+
+    Reste intrusif — d'où `--autoriser-ecran`. Sans ce drapeau, l'action n'est
+    même pas ANNONCÉE au serveur : il ne sait pas qu'elle existe, donc ne peut
+    pas la demander, et une injection de prompt n'a rien à quoi s'accrocher.
+    """
+    if SYSTEME == "windows":
+        avant, autres = _fenetres_windows()
+    elif SYSTEME == "darwin":
+        avant, autres = _fenetre_macos()
+    else:
+        avant, autres = _fenetre_linux()
+
+    if not avant and not autres:
+        return False, "Aucune fenêtre lisible (session verrouillée, ou xdotool absent)."
+
+    # Dédoublonné et plafonné : trente onglets de navigateur portent des titres
+    # proches, et le contexte du modèle n'a pas à les recevoir tous.
+    vus: set[str] = set()
+    propres: list[str] = []
+    for t in autres:
+        if t != avant and t not in vus:
+            vus.add(t)
+            propres.append(t)
+        if len(propres) >= 12:
+            break
+
+    lignes = ["Au premier plan : " + (avant or "inconnu")]
+    if propres:
+        lignes.append("Autres fenêtres : " + " · ".join(propres))
+    return True, "\n".join(lignes)
+
+
 # ── Registre des actions ─────────────────────────────────────────────────────
 
 ACTIONS = {
@@ -287,6 +385,7 @@ ACTIONS = {
     "shutdown": shutdown,
     "cancel_shutdown": cancel_shutdown,
     "status": status,
+    "screen": screen,
 }
 
 # Actions irréversibles ou perturbantes : elles ne s'exécutent qu'avec
@@ -294,13 +393,23 @@ ACTIONS = {
 # l'assistant ne doit pas pouvoir éteindre l'ordinateur.
 SENSIBLES = {"shutdown", "sleep", "app_quit"}
 
+# L'ecran a son PROPRE drapeau, et non `--autoriser-sensibles`. Le risque
+# n'est pas du meme ordre : les actions sensibles CASSENT quelque chose,
+# celle-ci RACONTE quelque chose. Les melanger obligerait a accepter d'etre
+# observe pour obtenir l'extinction, ou l'inverse.
+ECRAN = {"screen"}
 
-def actions_disponibles(autoriser_sensibles: bool) -> list[str]:
+
+def actions_disponibles(autoriser_sensibles: bool, autoriser_ecran: bool = False) -> list[str]:
     noms = set(ACTIONS)
     if SYSTEME == "linux" and not shutil.which("pactl"):
         noms -= {"volume_set", "volume_mute"}
+    if SYSTEME == "linux" and not shutil.which("xdotool"):
+        noms -= ECRAN
     if not autoriser_sensibles:
         noms -= SENSIBLES
+    if not autoriser_ecran:
+        noms -= ECRAN
     return sorted(noms)
 
 
@@ -351,15 +460,22 @@ async def session(url: str, nom: str, actions: list[str], une_fois: bool = False
         return True
 
 
-async def boucle(config: dict[str, Any], autoriser_sensibles: bool, une_fois: bool) -> int:
+async def boucle(
+    config: dict[str, Any],
+    autoriser_sensibles: bool,
+    une_fois: bool,
+    autoriser_ecran: bool = False,
+) -> int:
     url = url_websocket(config["hote"], config["jeton"])
     nom = config.get("nom") or socket.gethostname()
-    actions = actions_disponibles(autoriser_sensibles)
+    actions = actions_disponibles(autoriser_sensibles, autoriser_ecran)
 
     affichage = url.split("?")[0]  # jamais le jeton dans la console
     print(f"Agent « {nom} » → {affichage}")
     if autoriser_sensibles:
         print("  actions sensibles AUTORISÉES (extinction, veille, fermeture)")
+    if autoriser_ecran:
+        print("  lecture de l'écran AUTORISÉE (titres des fenêtres ouvertes)")
 
     attente = 2
     while True:
@@ -389,6 +505,11 @@ def main() -> int:
         action="store_true",
         help="autorise extinction, veille et fermeture d'applications",
     )
+    parseur.add_argument(
+        "--autoriser-ecran",
+        action="store_true",
+        help="autorise la lecture des titres de fenetres (sur quoi vous travaillez)",
+    )
     args = parseur.parse_args()
 
     config = assistant_configuration() if args.configurer else charger_config()
@@ -397,7 +518,9 @@ def main() -> int:
         return 1
 
     try:
-        return asyncio.run(boucle(config, args.autoriser_sensibles, args.test))
+        return asyncio.run(
+            boucle(config, args.autoriser_sensibles, args.test, args.autoriser_ecran)
+        )
     except KeyboardInterrupt:
         print("\nArrêt.")
         return 0

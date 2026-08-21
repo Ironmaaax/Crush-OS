@@ -306,6 +306,51 @@ def _copie_hors_machine() -> dict:
     )
 
 
+def _ou_il_est(requete: object | None = None) -> dict:
+    """Ce qu'on sait de sa joignabilite. Ni vert menteur, ni rouge injustifie.
+
+    Le maillon reste `ok` meme quand aucun appareil n'est en ligne : etre absent
+    du tailnet n'est pas une panne de l'assistant. Ce qui EST un probleme, c'est
+    de ne pas pouvoir mesurer -- la ou une decision d'interrompre quelqu'un se
+    prendrait alors a l'aveugle.
+    """
+    presence = getattr(getattr(requete, "app", None), "state", None)
+    presence = getattr(presence, "presence", None) if presence is not None else None
+    if presence is None:
+        return _maillon(
+            "Ou il est",
+            _ABSENT,
+            "mesure indisponible",
+            "Redemarrer le service : la mesure est construite au demarrage.",
+            "autonomie",
+        )
+    etat = getattr(presence, "_cache", None)
+    if etat is None:
+        return _maillon(
+            "Ou il est",
+            _OK,
+            "pas encore mesure (au prochain cycle proactif)",
+            "",
+            "autonomie",
+        )
+    if etat.erreur:
+        return _maillon(
+            "Ou il est",
+            _DEGRADE,
+            f"mesure impossible : {etat.erreur}",
+            "Verifier que `tailscale` repond : « tailscale status --json ».",
+            "autonomie",
+        )
+    en_ligne = sum(1 for a in etat.appareils if a["en_ligne"])
+    return _maillon(
+        "Ou il est",
+        _OK,
+        f"{etat.resume()} — {en_ligne}/{len(etat.appareils)} appareil(s) en ligne",
+        "",
+        "autonomie",
+    )
+
+
 def _autonomie() -> list[dict]:
     """Ce que l'assistant fait sans qu'on le lui demande."""
     docker = settings.docker_enabled
@@ -500,7 +545,13 @@ def _integrations() -> list[dict]:
 async def ecosysteme(request: Request) -> dict:
     """Vue d'ensemble : chaque maillon, son état, et son remède."""
     maillons = (
-        _cerveau() + _voix() + _memoire() + _autonomie() + _garde_fous() + _integrations()
+        _cerveau()
+        + _voix()
+        + _memoire()
+        + _autonomie()
+        + [_ou_il_est(request)]
+        + _garde_fous()
+        + _integrations()
     )
     return {
         "maillons": maillons,

@@ -529,6 +529,27 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Heures de silence ─────────────────────────────────────
+    # Le push fonctionne, et c'est justement le probleme : une suggestion sans
+    # urgence n'a pas a sonner a trois heures du matin. Ce qui se remarque, on
+    # finit par le couper -- et on perd alors l'alerte utile avec le reste.
+    push_heures_silence: str = Field(
+        default="23:00-07:00",
+        description=(
+            "Plage ou l'on ne pousse que ce qui ne peut pas attendre, au format "
+            "HH:MM-HH:MM. Vide = pousser a toute heure. La plage peut enjamber "
+            "minuit."
+        ),
+    )
+    push_silence_laisse_passer_urgent: bool = Field(
+        default=True,
+        description=(
+            "Pendant les heures de silence, laisser passer les decisions de "
+            "priorite haute. Sinon RIEN ne part, y compris ce qui ne peut pas "
+            "attendre le matin."
+        ),
+    )
+
     # ── Boite de reception Obsidian ───────────────────────────
     # Le miroir Markdown se regenere depuis SQLite : une correction tapee dedans
     # disparaissait au rendu suivant. La boite est le fichier qui, lui, est lu.
