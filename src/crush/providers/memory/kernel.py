@@ -259,13 +259,26 @@ class MemoryKernel:
             conn.commit()
 
     def update_fact(self, fact: Fact) -> None:
-        """Met à jour un fact existant + re-indexe FTS5."""
+        """Met à jour un fact existant + re-indexe FTS5.
+
+        `object` fait partie de la clause SET, et ce n'était pas le cas. Seul
+        `apply_correction` modifie ce champ (§6.7) — le chemin de correction
+        DOCUMENTÉ — et il renvoyait un fact portant la nouvelle valeur sans que
+        rien ne la persiste : la correction disparaissait au prochain
+        `get_fact`. Pire, `_fts_upsert` ci-dessous indexait, lui, la valeur
+        corrigée : une recherche plein texte trouvait le fait par son nouveau
+        libellé et l'affichait avec l'ancien.
+
+        Le test qui couvrait ce chemin vérifiait l'objet RENVOYÉ, jamais une
+        relecture en base — d'où la survie du défaut.
+        """
         with self._conn() as conn:
             conn.execute(
-                "UPDATE facts SET status=?, confidence=?, support_count=?, "
+                "UPDATE facts SET object=?, status=?, confidence=?, support_count=?, "
                 "decay_policy=?, importance=?, valid_from=?, valid_to=?, "
                 "last_seen_at=?, updated_at=? WHERE id=?",
                 (
+                    fact.object,
                     fact.status.value,
                     fact.confidence,
                     fact.support_count,

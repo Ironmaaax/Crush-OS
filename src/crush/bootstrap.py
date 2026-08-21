@@ -108,6 +108,7 @@ from crush.providers.llm.factory import (
 )
 from crush.providers.memory import visual_memory as _visual_memory
 from crush.providers.memory.auto_dream import AutoDream
+from crush.providers.memory.boite_reception import BoiteReception
 from crush.providers.memory.consolidation import ConsolidationAgent, CrossSessionRecall
 from crush.providers.memory.index import MemoryIndex
 from crush.providers.memory.ingest import MemoryIngest
@@ -533,6 +534,18 @@ def build(
         copier_vers=settings.backup_copy_to,
     )
 
+    # Consignes écrites à la main dans Obsidian. Même motif que la sauvegarde :
+    # construit ici, reçu par le scheduler via le Protocol `BoiteMemoire`.
+    # Le fichier est créé dès le boot — pas à la première passe — pour qu'il soit
+    # visible dans le coffre Obsidian sans avoir à attendre dix minutes.
+    boite_memoire = BoiteReception(
+        kernel=memory_kernel,
+        mirror=memory_mirror,
+        ingest=memory_ingest,
+    )
+    if settings.obsidian_inbox_enabled:
+        boite_memoire.creer_si_absente()
+
     scheduler = Scheduler(
         proactive=proactive_queue,
         auto_dream=auto_dream,
@@ -547,6 +560,7 @@ def build(
         # plupart du temps.
         notifications=notifications,
         sauvegarde=sauvegarde_memoire,
+        boite=boite_memoire,
     )
 
     # ── 16. Câblage des événements (Phase D — kernel.events.bus) ───────────

@@ -529,6 +529,25 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Boite de reception Obsidian ───────────────────────────
+    # Le miroir Markdown se regenere depuis SQLite : une correction tapee dedans
+    # disparaissait au rendu suivant. La boite est le fichier qui, lui, est lu.
+    obsidian_inbox_enabled: bool = Field(
+        default=True,
+        description=(
+            "Relit `memory_data/mirror/boite-de-reception.md` et applique les "
+            "consignes ecrites a la main (corriger, oublier, retenir)."
+        ),
+    )
+    obsidian_inbox_interval_minutes: int = Field(
+        default=10,
+        description=(
+            "Delai entre deux relectures de la boite. Court, parce qu'une "
+            "correction tapee sur telephone doit etre prise en compte pendant "
+            "qu'on y pense encore ; en dessous d'une minute, la valeur est ignoree."
+        ),
+    )
+
     backup_copy_to: str = Field(
         default="",
         description=(

@@ -300,6 +300,19 @@ def test_apply_correction_met_a_jour_fact_et_trace_event(tmp_path: Path) -> None
     assert updated is not None
     assert updated.object == "3h10"
 
+    # RELECTURE EN BASE, et pas seulement l'objet renvoyé. `update_fact` omettait
+    # `object` de sa clause SET : la correction n'existait que dans l'instance
+    # rendue, et le fait suivant lu depuis SQLite portait encore « sub-3h ».
+    # Vérifier la valeur de retour ne prouve rien — c'est celle qu'on vient
+    # d'écrire en mémoire.
+    relu = k.get_fact("goal_marathon")
+    assert relu is not None and relu.object == "3h10"
+
+    # Et l'index plein texte doit dire la même chose que la table : il était
+    # mis à jour, lui, ce qui rendait la mémoire contradictoire avec elle-même.
+    trouves = {f.id for f, _score in k.search_facts_fts("3h10")}
+    assert "goal_marathon" in trouves
+
     obs = k.list_observations("goal_marathon")
     assert len(obs) == 1
     assert obs[0].observation_type == ObservationType.CORRECT

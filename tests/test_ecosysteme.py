@@ -103,3 +103,60 @@ def test_invariant_du_remede_tient_sur_une_installation_neuve(
         if m["etat"] in {"degrade", "absent"} and not m["remede"].strip()
     ]
     assert not muets, f"état dégradé sans remède : {muets}"
+
+
+def test_la_boite_de_reception_apparait(vue: dict) -> None:
+    noms = {m["nom"] for m in vue["maillons"]}
+    assert "Boîte de réception" in noms
+
+
+def test_la_boite_absente_est_signalee_pas_verte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le fichier est créé au démarrage : son absence est une anomalie réelle.
+
+    Un voyant vert sur « fichier introuvable » laisserait croire qu'on peut
+    corriger un souvenir depuis Obsidian, alors qu'il n'y a rien à ouvrir.
+    """
+    monkeypatch.setattr(eco, "MEMORY_DATA_DIR", tmp_path)
+    monkeypatch.setattr(eco.settings, "obsidian_inbox_enabled", True, raising=False)
+
+    maillon = eco._boite_obsidian()
+
+    assert maillon["etat"] == "degrade"
+    assert maillon["remede"]
+
+
+def test_la_boite_desactivee_ne_passe_pas_pour_une_panne(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un réglage volontairement coupé n'est pas une avarie — il est « absent »."""
+    monkeypatch.setattr(eco, "MEMORY_DATA_DIR", tmp_path)
+    monkeypatch.setattr(eco.settings, "obsidian_inbox_enabled", False, raising=False)
+
+    maillon = eco._boite_obsidian()
+
+    assert maillon["etat"] == "absent"
+    assert "OBSIDIAN_INBOX_ENABLED" in maillon["remede"]
+
+
+def test_les_consignes_en_attente_sont_comptees_sans_le_mode_d_emploi(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le mode d'emploi et l'historique ne doivent pas gonfler le compteur."""
+    from crush.providers.memory.boite_reception import NOM_FICHIER, _gabarit
+
+    miroir = tmp_path / "mirror"
+    miroir.mkdir()
+    fichier = miroir / NOM_FICHIER
+    fichier.write_text(
+        _gabarit() + "\noublie ^fact-00c2b7c5e5\n\n## Traité le 01/01/2026 à 10:00\n\n- fait\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(eco, "MEMORY_DATA_DIR", tmp_path)
+    monkeypatch.setattr(eco.settings, "obsidian_inbox_enabled", True, raising=False)
+
+    maillon = eco._boite_obsidian()
+
+    assert maillon["etat"] == "ok"
+    assert "1 consigne(s) en attente" in maillon["detail"]

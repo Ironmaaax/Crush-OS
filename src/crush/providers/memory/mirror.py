@@ -136,6 +136,26 @@ class MemoryMirror:
         path.write_text(_HEADER_WARNING + body, encoding="utf-8")
 
 
+def ancre_de_fait(fact_id: str) -> str:
+    """Identifiant de bloc Obsidian pour un fait.
+
+    Obsidian n'accepte dans un `^identifiant` que lettres, chiffres et tirets :
+    l'underscore de `fact_00c2b7c5e5` rendrait l'ancre inerte. On le remplace, la
+    correspondance reste sans ambiguite dans les deux sens.
+
+    A quoi ca sert : sans prise sur un fait, on ne peut rien corriger depuis
+    Obsidian -- il faudrait decrire le souvenir de memoire et esperer que
+    l'assistant devine lequel. L'ancre donne une reference exacte, et Obsidian
+    l'affiche discretement tout en la rendant citable par `((reference))`.
+    """
+    return fact_id.replace("_", "-")
+
+
+def id_depuis_ancre(ancre: str) -> str:
+    """L'inverse : `fact-00c2b7c5e5` (ou `^fact-...`) redevient un id de fait."""
+    return ancre.lstrip("^").replace("-", "_", 1)
+
+
 def _file_to_title(filename: str) -> str:
     stem = Path(filename).stem
     return stem.replace("_", " ").replace("-", " ").title()
@@ -154,7 +174,7 @@ def _render(facts: list[Fact], title: str) -> str:
             f"conf {f.confidence:.2f} · imp {f.importance:.2f} · "
             f"vu {f.support_count}× · {f.decay_policy.value}"
         )
-        lines.append(f"- **{f.subject} {f.predicate} {f.object}** ({meta})")
+        lines.append(f"- **{f.subject} {f.predicate} {f.object}** ({meta}) ^{ancre_de_fait(f.id)}")
         if f.valid_to:
             lines.append(f"  - échéance : {f.valid_to.date().isoformat()}")
     return "\n".join(lines) + "\n"

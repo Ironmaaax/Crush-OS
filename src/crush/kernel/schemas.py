@@ -541,3 +541,23 @@ class ResultatSauvegarde:
     purgees: int = 0
     copiee_hors_machine: bool = False
     erreur: str | None = None
+
+
+@dataclass
+class ResultatBoiteReception:
+    """Ce qu'une passe de la boite Obsidian a fait (cf. providers/memory/boite_reception.py).
+
+    Toutes les valeurs a zero est le cas NORMAL, pas un echec : la boite est vide
+    la plupart du temps. Le scheduler s'en sert pour ne parler que quand il y a
+    quelque chose a dire -- une consigne appliquee, ou une consigne incomprise.
+
+    `ignorees` et `incomprises` sont distinctes a dessein : une consigne bien
+    ecrite qui vise un fait disparu n'est pas une faute de frappe, et ne se
+    repare pas de la meme facon.
+    """
+
+    appliquees: int = 0
+    ignorees: int = 0
+    incomprises: int = 0
+    retenus: int = 0
+    erreur: str | None = None

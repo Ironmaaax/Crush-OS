@@ -25,10 +25,12 @@ from crush.engine.background.routines import (
 )
 from crush.kernel.contracts import (
     AutoDreamer,
+    BoiteMemoire,
     CalendarReadTool,
     MemoryBackup,
     NotionReadTool,
 )
+from crush.kernel.schemas import ResultatBoiteReception
 from crush.kernel.settings import Settings
 
 
@@ -64,6 +66,7 @@ class Scheduler:
         curator: object | None = None,
         notifications: NotificationQueue | None = None,
         sauvegarde: MemoryBackup | None = None,
+        boite: BoiteMemoire | None = None,
     ) -> None:
         self._proactive = proactive
         self._auto_dream = auto_dream
@@ -74,6 +77,8 @@ class Scheduler:
         self._curator = curator  # PHASE 6 — Curator nocturne
         # Archivage de la mémoire. Injecté (RÈGLE 3 : l'engine n'importe pas providers).
         self._sauvegarde = sauvegarde
+        # Consignes écrites à la main dans Obsidian. Même règle d'injection.
+        self._boite = boite
         # File des notifications, glissées en fin de réponse par le Gateway.
         # `_proactive.broadcast` ne touche que les clients CONNECTÉS à l'instant :
         # sur une machine allumée en permanence et consultée par intermittence,
@@ -101,6 +106,8 @@ class Scheduler:
             self._tasks.append(
                 asyncio.create_task(self._sauvegarde_loop(), name="scheduler-sauvegarde")
             )
+        if self._boite is not None and self._settings.obsidian_inbox_enabled:
+            self._tasks.append(asyncio.create_task(self._boite_loop(), name="scheduler-boite"))
         logger.info("Scheduler started", tasks=len(self._tasks))
 
     def stop(self) -> None:
@@ -473,4 +480,57 @@ class Scheduler:
                     f"Mémoire sauvegardée ({resultat.archive}), mais {resultat.erreur} "
                     "L'archive est donc sur le même support que l'original."
                 )
+
+    async def _boite_loop(self) -> None:
+        """Relit la boîte de réception Obsidian et applique ce qui y est écrit.
+
+        Cadence courte — dix minutes par défaut. Une correction tapée depuis un
+        téléphone doit être prise en compte pendant qu'on y pense encore : la
+        rattacher à la passe nocturne, c'est laisser un souvenir faux nourrir les
+        réponses de toute la journée, et douter que la correction ait été reçue.
+
+        Le coût d'une passe à vide est la lecture d'un fichier de quelques lignes,
+        et elle n'écrit rien du tout : c'est ce qui permet cette fréquence.
+        """
+        if self._boite is None:
+            return
+        # Une valeur inférieure à la minute serait une erreur de saisie, pas une
+        # intention : on ne relit pas un fichier dix fois par seconde.
+        intervalle = max(60, self._settings.obsidian_inbox_interval_minutes * 60)
+        while True:
+            await asyncio.sleep(intervalle)
+            try:
+                resultat = await self._boite.traiter()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Boîte de réception échec", error=str(exc))
+                continue
+
+            if resultat.erreur:
+                self._signaler(
+                    f"J'ai lu la boîte de réception mais {resultat.erreur} "
+                    "Les consignes ont été appliquées ; c'est la trace écrite qui manque."
+                )
+
+            # On confirme ce qui a été fait : sans retour, il faut rouvrir le
+            # fichier pour savoir si la consigne a été comprise. Le fichier porte
+            # le détail, ce message dit seulement qu'il y a quelque chose à y voir.
+            if resultat.appliquees:
+                self._signaler(_resume_boite(resultat))
+            elif resultat.ignorees or resultat.incomprises:
+                self._signaler(
+                    f"{resultat.ignorees + resultat.incomprises} consigne(s) de la boîte "
+                    "de réception n'ont rien donné. La raison est écrite dans le fichier."
+                )
+
+
+def _resume_boite(resultat: ResultatBoiteReception) -> str:
+    """Une phrase qui dit ce qui a changé dans la mémoire, sans jargon."""
+    morceaux = [f"{resultat.appliquees} consigne(s) appliquée(s)"]
+    if resultat.retenus:
+        morceaux.append(f"{resultat.retenus} nouveau(x) fait(s) retenu(s)")
+    if resultat.ignorees:
+        morceaux.append(f"{resultat.ignorees} sans effet")
+    if resultat.incomprises:
+        morceaux.append(f"{resultat.incomprises} incomprise(s)")
+    return "Boîte de réception : " + ", ".join(morceaux) + "."
 

@@ -42,6 +42,7 @@ from crush.kernel.schemas import (
     FactObservation,
     FactRelation,
     FactStatus,
+    ResultatBoiteReception,
     ResultatSauvegarde,
     UsageEntry,
 )
@@ -511,6 +512,23 @@ class MemoryBackup(Protocol):
 
     async def sauvegarder(self) -> ResultatSauvegarde: ...
     def age_heures(self) -> float | None: ...
+
+
+@runtime_checkable
+class BoiteMemoire(Protocol):
+    """Consignes ecrites a la main vers la memoire (cf. providers/memory/boite_reception.py).
+
+    Le miroir Markdown est unidirectionnel : il se REGENERE depuis SQLite a chaque
+    passe nocturne. Une correction tapee dedans disparaissait donc au rendu
+    suivant, ce qui laissait un souvenir faux sans aucun moyen de le rectifier
+    autrement qu'en parlant a l'assistant au bon moment.
+
+    La boite est un fichier que le miroir n'ecrit jamais, relu periodiquement, et
+    dont chaque ligne devient un `human_correction`. Utilise par
+    `engine/background/scheduler.py`.
+    """
+
+    async def traiter(self) -> ResultatBoiteReception: ...
 
 
 @runtime_checkable

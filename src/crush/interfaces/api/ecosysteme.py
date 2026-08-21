@@ -150,7 +150,70 @@ def _memoire() -> list[dict]:
         _maillon("Mémoire", _OK, f"{taille:.1f} Mo", "", "memoire"),
         _sauvegarde(),
         _copie_hors_machine(),
+        _boite_obsidian(),
     ]
+
+
+def _boite_obsidian() -> dict:
+    """Le chemin de retour : ce qu'on écrit à la main vers la mémoire.
+
+    Ce maillon dit si le fichier EXISTE et s'il attend quelque chose. Il ne
+    prétend pas dire si la synchronisation vers le téléphone fonctionne — rien
+    tournant sur cette machine ne peut le savoir, et un voyant vert qui
+    signifierait seulement « le fichier est là » induirait en erreur.
+    """
+    from crush.providers.memory.boite_reception import NOM_FICHIER
+
+    if not settings.obsidian_inbox_enabled:
+        return _maillon(
+            "Boîte de réception",
+            _ABSENT,
+            "désactivée — aucune correction écrite à la main n'est relue",
+            "Mettre OBSIDIAN_INBOX_ENABLED=true dans .env, puis redémarrer.",
+            "memoire",
+        )
+
+    chemin = MEMORY_DATA_DIR / "mirror" / NOM_FICHIER
+    if not chemin.exists():
+        return _maillon(
+            "Boîte de réception",
+            _DEGRADE,
+            "fichier absent alors que la relecture est active",
+            "Redémarrer le service : le fichier est créé au démarrage.",
+            "memoire",
+        )
+
+    # Une consigne encore en attente n'est pas une anomalie tant que la passe
+    # n'a pas tourné — au pire dix minutes. On l'affiche sans alarmer.
+    en_attente = _consignes_en_attente(chemin)
+    if en_attente:
+        return _maillon(
+            "Boîte de réception",
+            _OK,
+            f"{en_attente} consigne(s) en attente de la prochaine passe",
+            "",
+            "memoire",
+        )
+    return _maillon("Boîte de réception", _OK, "à jour, rien en attente", "", "memoire")
+
+
+def _consignes_en_attente(chemin: Path) -> int:
+    """Compte les lignes non traitées, sans importer la logique de lecture.
+
+    Volontairement approximatif : ce compteur alimente un voyant, pas une
+    décision. La lecture qui fait foi est celle de `boite_reception._lire`.
+    """
+    try:
+        contenu = chemin.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    total = 0
+    for brute in contenu.split("## Traité")[0].splitlines():
+        ligne = brute.strip()
+        if not ligne or ligne.startswith(("#", ">", "<!--", "_", "---", "```", "|")):
+            continue
+        total += 1
+    return total
 
 
 # Au-delà, la passe quotidienne ne tourne manifestement plus. 36 h laisse passer
