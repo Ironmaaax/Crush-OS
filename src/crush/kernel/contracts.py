@@ -130,6 +130,17 @@ class MemoryStore(Protocol):
         category: str,
     ) -> Fact | None: ...
 
+    # Etage 0 de la reconciliation : le fait exact, objet compris. Sans lui,
+    # « max uses spotify » etait insere a chaque passage parce que le matcher
+    # large rendait « max uses vue obsidian » -- mesure : 4 doublons.
+    def find_active_exact(
+        self,
+        subject: str,
+        predicate: str,
+        object: str,  # noqa: A002 - nom impose par le champ du Fact
+        category: str,
+    ) -> Fact | None: ...
+
     def list_facts_by_status(self, status: FactStatus, limit: int | None = None) -> list[Fact]: ...
 
     def list_facts_by_category(

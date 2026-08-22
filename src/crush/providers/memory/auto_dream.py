@@ -45,6 +45,46 @@ def _deep_system(name: str, assistant_name: str = "Crush") -> str:
     )
 
 
+def _refus_de_remplacement(ancien: str, nouveau: str) -> str | None:
+    """Le nouveau contenu peut-il remplacer les préférences ? Rend la raison du refus.
+
+    POURQUOI CE GARDE-FOU
+
+    `_run_micro` remplaçait TOUT le fichier par la sortie brute du modèle, après
+    chaque échange, avec pour seule condition qu'elle soit non vide et
+    différente. Une réponse comme « Rien à changer. » satisfait ces deux
+    conditions : la phrase DEVENAIT la mémoire de l'utilisateur. Sans sauvegarde,
+    et huit à cinquante fois par jour.
+
+    Une mémoire ne se réécrit pas intégralement à chaque phrase. Les trois refus
+    ci-dessous encadrent ce qu'un remplacement légitime peut être.
+    """
+    a, n = ancien.strip(), nouveau.strip()
+
+    # 1. L'effondrement. Une mémoire construite ne perd pas la moitié de sa
+    #    substance en un échange — c'est la signature d'un refus du modèle ou
+    #    d'une réponse tronquée, pas d'une mise à jour.
+    if len(a) >= 120 and len(n) < len(a) * 0.5:
+        return f"effondrement de taille ({len(a)} -> {len(n)} octets)"
+
+    # 2. La forme. Le fichier est une liste à puces sous un titre. Une réponse
+    #    conversationnelle n'en a ni l'un ni l'autre.
+    lignes = [x.strip() for x in n.splitlines() if x.strip()]
+    puces = sum(1 for x in lignes if x.startswith(("-", "*", "•")))
+    if puces < 2 and not any(x.startswith("#") for x in lignes):
+        return "ni titre ni liste à puces — ressemble à une réponse, pas à une mémoire"
+
+    # 3. Les acquiescements. Le modèle répond parfois à la consigne au lieu de
+    #    l'exécuter. On les reconnaît explicitement plutôt que d'espérer que les
+    #    deux règles précédentes les attrapent toujours.
+    debut = n[:60].lower()
+    for aveu in ("rien à changer", "rien a changer", "aucun changement", "pas de "):
+        if debut.startswith(aveu):
+            return f"acquiescement du modèle plutôt qu'un contenu ({aveu!r})"
+
+    return None
+
+
 class AutoDream:
     """Micro-update fire-and-forget après chaque échange + analyse profonde nocturne à 3h."""
 
@@ -87,6 +127,17 @@ class AutoDream:
         return self._prefs_path.read_text(encoding="utf-8")
 
     def _write_prefs(self, content: str) -> None:
+        # Une génération conservée avant d'écraser. Les garde-fous de
+        # `_refus_de_remplacement` arrêtent les cas connus, pas les inconnus — et
+        # ce fichier est la seule mémoire en prose de l'assistant. Un `.bak`
+        # coûte quelques centaines d'octets et rend l'accident réversible.
+        if self._prefs_path.exists():
+            try:
+                self._prefs_path.with_suffix(".md.bak").write_text(
+                    self._prefs_path.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            except OSError as exc:  # noqa: BLE001 — l'écriture prime sur la sauvegarde
+                logger.warning("Préférences : sauvegarde impossible", error=str(exc))
         self._prefs_path.write_text(content, encoding="utf-8")
 
     # ── Micro (fire-and-forget, après chaque échange) ─────────
@@ -117,8 +168,18 @@ class AutoDream:
         )
         updated = str(result).strip()
         if updated and updated != prefs.strip():
-            self._write_prefs(updated)
-            logger.info("AutoDream micro: préférences mises à jour")
+            refus = _refus_de_remplacement(prefs, updated)
+            if refus is not None:
+                # On garde l'ancien contenu. Le prochain échange retentera : une
+                # réponse aberrante est un accident, pas un état.
+                logger.warning(
+                    "AutoDream micro: remplacement des préférences REFUSÉ",
+                    raison=refus,
+                    recu=updated[:120],
+                )
+            else:
+                self._write_prefs(updated)
+                logger.info("AutoDream micro: préférences mises à jour")
 
         # PHASE 3 — Ingestion parallèle dans le Kernel (best-effort, ne bloque pas).
         if self._ingest is not None:

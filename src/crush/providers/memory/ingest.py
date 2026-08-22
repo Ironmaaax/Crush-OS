@@ -362,6 +362,25 @@ class MemoryIngest:
             self._kernel.insert_fact(fact)
             return _Outcome("needs_review", fact)
 
+        # ── Étage 0 — le fait exact existe-t-il déjà ? ────────────────────
+        #
+        # Cet étage manquait, et c'est ce qui produisait les doublons. L'étage 1
+        # ci-dessous ne regarde que (sujet, prédicat, catégorie) et rend UN seul
+        # fait : à l'arrivée de « max uses spotify » il rendait « max uses vue
+        # obsidian », les objets différaient, et on tombait en coexistence — donc
+        # on insérait. À chaque passage. Mesuré : 4 × `max uses spotify`.
+        #
+        # Un fait déjà connu à l'identique se CONFIRME : son support monte, sa
+        # confiance aussi. C'est ce qu'on veut d'une répétition.
+        exact = self._kernel.find_active_exact(
+            subject=cand.subject,
+            predicate=cand.predicate,
+            object=cand.object,
+            category=cand.category,
+        )
+        if exact is not None:
+            return self._confirm(exact, cand, evt)
+
         # ── Étage 1 — déterministe ────────────────────────────────────────
         match = self._kernel.find_active_match(
             subject=cand.subject,

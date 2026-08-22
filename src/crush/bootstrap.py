@@ -469,6 +469,11 @@ def build(
         notifications=notifications,
         worker=worker,
         recall=cross_recall,
+        # Les faits du Memory Kernel atteignent enfin le prompt. Jusqu'ici
+        # AUCUN chemin ne les y amenait : `MemoryRetrieval` n'etait instancie
+        # nulle part, et `memory_search` lit un index vectoriel alimente par
+        # `topics/` et `sessions/` ou les faits n'entrent jamais.
+        memory_store=memory_kernel,
     )
     voice_gateway = Gateway(
         session_manager=session_manager,
@@ -476,6 +481,7 @@ def build(
         notifications=notifications,
         worker=worker,
         recall=cross_recall,
+        memory_store=memory_kernel,
         # Extraits bruts plutôt qu'un résumé : économise un aller-retour LLM
         # complet au premier échange de chaque session vocale.
         summarize_recall=False,

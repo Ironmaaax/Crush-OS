@@ -118,6 +118,13 @@ target-version = "py311"
 line-length = 100
 indent-width = 4
 
+# Outillage tiers, pas du code du projet. `.specify/` est installé par Spec Kit
+# et RÉÉCRIT à chaque `specify upgrade` : y corriger un style serait effacé au
+# prochain passage, et ses six écarts faisaient échouer la première porte de
+# qualité sur du code qu'on ne maintient pas. La consigne « brownfield » de Spec
+# Kit dit elle-même de séparer son outillage des artefacts du projet.
+extend-exclude = [".specify"]
+
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors

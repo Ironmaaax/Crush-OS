@@ -98,6 +98,7 @@ class Agent:
         notifications: list[str] | None = None,
         recall_summary: str | None = None,
         reflexion: bool = False,
+        memoire: str | None = None,
     ) -> str:
         """Assemble le prompt système : partie statique + contexte dynamique.
 
@@ -185,6 +186,12 @@ class Agent:
             model_text = self._user_model_path.read_text(encoding="utf-8").strip()
             if model_text:
                 dynamic_parts.append(f"## Modèle utilisateur\n\n{model_text}")
+
+        # Les faits du Kernel. Ils viennent AVANT les preferences en prose :
+        # ils sont la source de verite (corrigeable, tracee, datee), la prose
+        # n'est qu'une synthese produite par une passe LLM separee.
+        if memoire:
+            dynamic_parts.append(f"## Ce que tu sais de {firstname}\n\n{memoire}")
 
         if self._user_prefs_path is not None and self._user_prefs_path.exists():
             prefs = self._user_prefs_path.read_text(encoding="utf-8").strip()
@@ -304,6 +311,7 @@ class Agent:
         user_message: str,
         stream: bool = True,
         notifications: list[str] | None = None,
+        memoire: str | None = None,
     ) -> str | AsyncIterator[str]:
         """Routing-only pass : ajoute le message, appelle le LLM SANS outils (streaming).
 
@@ -313,7 +321,7 @@ class Agent:
         session.add_message("user", user_message)
         llm = self._choisir_llm(user_message)
         system = self._build_system(
-            notifications=notifications, reflexion=llm is not self._llm
+            notifications=notifications, reflexion=llm is not self._llm, memoire=memoire
         )
         logger.debug("Agent responding", session_id=str(session.id), stream=stream)
 
@@ -358,6 +366,7 @@ class Agent:
         user_message: str,
         notifications: list[str] | None = None,
         recall_summary: str | None = None,
+        memoire: str | None = None,
     ) -> tuple[AsyncIterator[str], ToolCapture | None]:
         """Un seul appel LLM streamé, avec outils si disponibles.
 
@@ -371,6 +380,7 @@ class Agent:
             notifications=notifications,
             recall_summary=recall_summary,
             reflexion=llm is not self._llm,
+            memoire=memoire,
         )
         logger.debug("Agent routing stream", session_id=str(session.id))
 
@@ -420,6 +430,9 @@ class Agent:
         ack_text: str,
         capture: ToolCapture,
         results: list[str],
+        notifications: list[str] | None = None,
+        recall_summary: str | None = None,
+        memoire: str | None = None,
     ) -> AsyncIterator[str]:
         """Second appel LLM pour synthétiser les résultats d'outils en réponse naturelle.
 
@@ -450,7 +463,17 @@ class Agent:
             {"role": "user", "content": tool_result_blocks},
         ]
 
-        system = self._build_system()
+        # Le contexte est TRANSMIS ici, alors que l'appel etait nu.
+        #
+        # C'est cette passe qui ecrit la reponse effectivement lue par
+        # l'utilisateur : la passe 1 n'a produit qu'un accuse de reception et des
+        # appels d'outils. Un `_build_system()` sans arguments perdait donc les
+        # notifications en attente ET le rappel des sessions precedentes
+        # exactement la ou ils comptent -- l'assistant les « oubliait » des qu'un
+        # outil entrait en jeu.
+        system = self._build_system(
+            notifications=notifications, recall_summary=recall_summary, memoire=memoire
+        )
         logger.debug("Agent synthesizing tool results", tools=[n for _, n, _ in capture.calls])
 
         # Pas de tools ici : le LLM se concentre sur la synthèse, pas de chainage.

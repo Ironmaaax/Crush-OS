@@ -32,9 +32,12 @@ _HALFLIFE_DAYS: dict[DecayPolicy, float] = {
     DecayPolicy.FAST: 14.0,  # 2 semaines
 }
 
-# Plafond pour la normalisation BM25 → [0, 1]. bm25 plus bas = plus pertinent ;
-# au-delà de ce seuil, on plafonne (peu pertinent).
-_BM25_CAP = 20.0
+# Échelle de normalisation BM25 → [0, 1]. Un |bm25| plus grand = plus pertinent ;
+# au-delà de ce seuil la pertinence sature, parce que passé un certain point
+# « très pertinent » ne se subdivise plus utilement. Calé sur 8 et non 20 : les
+# faits sont des documents de quatre champs courts, leurs magnitudes réelles
+# restent sous 8, et un plafond trop haut tassait tout dans [0,67 ; 1,0].
+_BM25_CAP = 8.0
 
 
 @dataclass
@@ -114,17 +117,34 @@ class MemoryRetrieval:
 
 
 def _bm25_to_relevance(bm25: float) -> float:
-    """BM25 (plus bas = mieux) → [0, 1] (plus haut = plus pertinent).
+    """BM25 de FTS5 → pertinence dans [0, 1], CROISSANTE avec la qualité du match.
 
-    bm25=0 (pas de match) → 0.0 (cold start handled au caller).
-    bm25 négatif (typique FTS5) → ~1.0 (très pertinent).
-    bm25 > _BM25_CAP → 0.0.
+    LA FORMULE ÉTAIT INVERSÉE
+
+    FTS5 rend un bm25 négatif, et plus il est négatif, plus le document est
+    pertinent. L'ancienne version calculait `exp(-|bm25| / cap)`, une fonction
+    DÉCROISSANTE en |bm25| : un fait touchant trois termes de la question
+    (bm25 ≈ -6) obtenait 0,74, tandis qu'un fait n'en touchant qu'un
+    (bm25 ≈ -1,2) obtenait 0,94. Le moins pertinent gagnait de 27 %. Le
+    docstring d'origine annonçait pourtant l'inverse de ce que le code faisait.
+
+    Ce défaut est resté invisible parce que `search_facts_fts` enveloppait la
+    requête en phrase exacte et ne rendait donc jamais rien : la pertinence
+    valait 0 partout, la formule n'était jamais exercée. Réparer la recherche
+    a rendu ce bug actif — d'où sa correction ici, dans le même mouvement.
+
+    Le plafond passe de 20 à 8 : sur des documents de quatre champs courts
+    (sujet, prédicat, objet, catégorie), les magnitudes réelles restent sous 8.
+    Avec un plafond à 20, toutes les pertinences se tassaient dans [0,67 ; 1,0]
+    et l'axe ne discriminait presque rien.
     """
     if bm25 == 0.0:
+        # Pas de match : le repli « cold start » est traité par l'appelant.
         return 0.0
-    # FTS5 BM25 est négatif quand pertinent. On veut une fonction décroissante.
-    # Score = exp(- abs(bm25) / cap) borné.
-    rel = math.exp(-min(abs(bm25), _BM25_CAP) / _BM25_CAP)
+    # Croissante en |bm25|, bornée, sans cas dégénéré : 1 - exp(-x) vaut 0 en 0
+    # et tend vers 1. À x = cap, on atteint 0,63 ; au-delà, la saturation est
+    # voulue — passé un certain point, « très pertinent » ne se subdivise plus.
+    rel = 1.0 - math.exp(-min(abs(bm25), _BM25_CAP) / _BM25_CAP)
     return max(0.0, min(1.0, rel))
 
 
