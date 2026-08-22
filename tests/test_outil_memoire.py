@@ -37,13 +37,33 @@ class _FakeVectorIndex:
     async def add(self, doc_id: str, text: str, metadata: dict | None = None) -> None:
         self.docs[doc_id] = {"text": text, "metadata": metadata or {}}
 
-    async def search(self, query: str, k: int = 5) -> list[dict]:
-        hits = [
-            {"doc_id": d, "text": v["text"], "metadata": v["metadata"], "score": 1.0}
-            for d, v in self.docs.items()
-            if query.lower() in v["text"].lower()
-        ]
+    async def search(
+        self,
+        query: str,
+        k: int = 5,
+        source: str | None = None,
+        exclure: str | None = None,
+    ) -> list[dict]:
+        hits = []
+        for d, v in self.docs.items():
+            if query.lower() not in v["text"].lower():
+                continue
+            provenance = (v["metadata"] or {}).get("source")
+            if source is not None and provenance != source:
+                continue
+            if exclure is not None and provenance == exclure:
+                continue
+            hits.append(
+                {"doc_id": d, "text": v["text"], "metadata": v["metadata"], "score": 1.0}
+            )
         return hits[:k]
+
+    async def remove_source(self, source: str) -> int:
+        avant = len(self.docs)
+        self.docs = {
+            d: v for d, v in self.docs.items() if (v["metadata"] or {}).get("source") != source
+        }
+        return avant - len(self.docs)
 
     async def persist(self) -> None:
         self.persist_calls += 1

@@ -12,6 +12,7 @@ from pathlib import Path
 from loguru import logger
 
 from crush.providers.llm.base import LLMProvider
+from crush.providers.memory.fact_index import FactIndex
 from crush.providers.memory.ingest import IngestResult, MemoryIngest
 from crush.providers.memory.kernel import MemoryKernel
 from crush.providers.memory.mirror import MemoryMirror
@@ -97,6 +98,7 @@ class AutoDream:
         memory_ingest: MemoryIngest | None = None,
         mirror: MemoryMirror | None = None,
         kernel: MemoryKernel | None = None,
+        fact_index: FactIndex | None = None,
         user_firstname: str = "Max",
         assistant_name: str = "Crush",
     ) -> None:
@@ -124,6 +126,7 @@ class AutoDream:
         # quand `ingest_deep_enabled` est faux, cas où bootstrap ne transmet
         # aucun ingest.
         self._kernel = kernel
+        self._fact_index = fact_index
 
     def _ensure_prefs(self) -> None:
         if not self._prefs_path.exists():
@@ -256,6 +259,16 @@ class AutoDream:
                     logger.info("AutoDream deep: variantes absorbées", nombre=variantes)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("AutoDream deep: fusion des variantes échouée", error=str(exc))
+
+        # 2ter) Réindexation sémantique des faits. APRÈS les fusions : indexer
+        # avant aurait laissé les doublons absorbés trouvables par la recherche
+        # alors qu'ils viennent d'être archivés.
+        if self._fact_index is not None:
+            try:
+                indexes = await self._fact_index.synchroniser()
+                logger.info("AutoDream deep: faits réindexés", nombre=indexes)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("AutoDream deep: réindexation des faits échouée", error=str(exc))
 
         # 3) Régénération du miroir Markdown (SQLite → MD unidirectionnel, §6.7).
         # Tourne UNIQUEMENT en deep nocturne — c'est l'instant où la base est

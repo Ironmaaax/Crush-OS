@@ -112,6 +112,7 @@ from crush.providers.memory import visual_memory as _visual_memory
 from crush.providers.memory.auto_dream import AutoDream
 from crush.providers.memory.boite_reception import BoiteReception
 from crush.providers.memory.consolidation import ConsolidationAgent, CrossSessionRecall
+from crush.providers.memory.fact_index import FactIndex
 from crush.providers.memory.index import MemoryIndex
 from crush.providers.memory.ingest import MemoryIngest
 from crush.providers.memory.kernel import MemoryKernel
@@ -161,6 +162,7 @@ class Container:
     cross_recall: CrossSessionRecall
     consolidation: ConsolidationAgent
     auto_dream: AutoDream
+    fact_index: FactIndex
     stt: SpeechToText
 
     # ── Capabilities L1 ────────────────────────────────────────────────────
@@ -295,6 +297,15 @@ def build(
     )
     _deep_ingest = memory_ingest if settings.ingest_deep_enabled else None
 
+    # Les faits, rendus atteignables en conversation. Le bloc injecté dans le
+    # prompt est plafonné (22 places) ; sans cet index, les faits au-delà
+    # n'avaient AUCUN chemin d'accès — ni memory_search, ni session_recall.
+    fact_index = FactIndex(
+        kernel=memory_kernel,
+        vector_index=vector_index,
+        user_firstname=settings.display_name,
+    )
+
     auto_dream = AutoDream(
         llm=background_llm,
         prefs_path=user_prefs_path,
@@ -302,6 +313,7 @@ def build(
         memory_ingest=_deep_ingest,
         mirror=memory_mirror,
         kernel=memory_kernel,
+        fact_index=fact_index,
         user_firstname=settings.display_name,
         assistant_name=settings.display_assistant_name,
     )
@@ -642,6 +654,7 @@ def build(
         cross_recall=cross_recall,
         consolidation=consolidation,
         auto_dream=auto_dream,
+        fact_index=fact_index,
         stt=stt,
         # Capabilities L1
         calendar_list_tool=calendar_list_tool,

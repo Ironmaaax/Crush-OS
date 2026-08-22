@@ -138,17 +138,79 @@ class VectorIndex:
             )
         logger.debug("VectorIndex.add", doc_id=doc_id, chunks=len(chunks))
 
-    async def search(self, query: str, k: int = 5) -> list[dict]:
-        """Recherche les k chunks les plus pertinents par similarité cosinus."""
+    async def remove_source(self, source: str) -> int:
+        """Retire toutes les entrées d'une source. Rend le nombre retiré.
+
+        Nécessaire pour tenir l'index en accord avec SQLite. `add` remplace un
+        document par son `doc_id`, mais rien ne savait retirer un document
+        DISPARU — un fait archivé restait donc trouvable indéfiniment, et les
+        doublons absorbés seraient revenus par la recherche après avoir été
+        fusionnés en base.
+
+        Sert au resynchronisation en bloc : on retire tout d'une source, on
+        réindexe l'état courant. Idempotent par construction, contrairement à un
+        suivi incrémental qui dérive au premier plantage.
+        """
+        async with self._lock:
+            garder = [
+                i
+                for i, e in enumerate(self._manifest)
+                if (e.get("metadata") or {}).get("source") != source
+            ]
+            retires = len(self._manifest) - len(garder)
+            if retires == 0:
+                return 0
+            self._manifest = [self._manifest[i] for i in garder]
+            self._vectors = (
+                self._vectors[garder] if garder and self._vectors is not None else None
+            )
+        logger.debug("VectorIndex.remove_source", source=source, retires=retires)
+        return retires
+
+    async def search(
+        self,
+        query: str,
+        k: int = 5,
+        source: str | None = None,
+        exclure: str | None = None,
+    ) -> list[dict]:
+        """Recherche les k chunks les plus pertinents par similarité cosinus.
+
+        `source` restreint à une provenance, `exclure` en écarte une. Les deux
+        existent parce que l'index est PARTAGÉ entre des textes de longueurs très
+        différentes : mesuré sur la base réelle, une fois les faits indexés, la
+        question « comment configurer le DAC PCM5102A » ne rendait plus que des
+        faits — cinq sur cinq — et plus aucun passage de topic. Une phrase courte
+        gagne au cosinus contre un paragraphe, quel que soit le sujet.
+
+        Le filtre est appliqué AVANT la sélection des k meilleurs, et non après :
+        filtrer ensuite aurait rendu moins de k résultats sans le dire, en
+        donnant l'impression qu'il n'y avait rien de plus à trouver.
+        """
         if not query.strip() or self._vectors is None or len(self._manifest) == 0:
             return []
         qv = await self._embed([query])
         scores = (self._vectors @ qv[0]).astype(float)
+
+        if source is not None or exclure is not None:
+            provenances = [(e.get("metadata") or {}).get("source") for e in self._manifest]
+            masque = np.array(
+                [
+                    (source is None or p == source) and (exclure is None or p != exclure)
+                    for p in provenances
+                ]
+            )
+            if not masque.any():
+                return []
+            scores = np.where(masque, scores, -np.inf)
+
         k = min(k, len(scores))
         top_idx = np.argpartition(-scores, k - 1)[:k]
         top_idx = top_idx[np.argsort(-scores[top_idx])]
         results: list[dict] = []
         for i in top_idx:
+            if not np.isfinite(scores[int(i)]):
+                continue  # écarté par le filtre de source
             entry = self._manifest[int(i)]
             results.append(
                 {

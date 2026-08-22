@@ -369,3 +369,149 @@ def test_chunk_text_handles_short_and_long(tmp_path: Path) -> None:
     assert len(chunks) >= 2
     # Premier chunk : 500 mots
     assert len(chunks[0].split()) == 500
+
+
+# ── Couche 4 : provenance dans l'index partagé ────────────────────────
+
+
+async def test_remove_source_ne_touche_que_sa_provenance(
+    fake_vector_index: VectorIndex,
+) -> None:
+    """Les faits partagent l'index avec les topics et les transcriptions.
+
+    Une seule instance, parce que le modèle fastembed est chargé PAR instance
+    (~25 s sur le Pi) : un second index doublerait ce coût et la mémoire. D'où le
+    besoin de retirer une provenance sans toucher aux autres.
+    """
+    await fake_vector_index.add(
+        doc_id="topic:music.md",
+        text="Spotify pour la musique",
+        metadata={"source": "topic", "filename": "music.md"},
+    )
+    await fake_vector_index.add(
+        doc_id="fait:f1",
+        text="Max préfère Spotify. (outil)",
+        metadata={"source": "fact", "fact_id": "f1"},
+    )
+
+    assert await fake_vector_index.remove_source("fact") == 1
+
+    restants = await fake_vector_index.search(query="spotify musique", k=5)
+    assert [r["doc_id"] for r in restants] == ["topic:music.md"]
+
+
+async def test_remove_source_inconnue_ne_retire_rien(
+    fake_vector_index: VectorIndex,
+) -> None:
+    await fake_vector_index.add(
+        doc_id="topic:music.md", text="Spotify", metadata={"source": "topic"}
+    )
+    assert await fake_vector_index.remove_source("fact") == 0
+    assert len(await fake_vector_index.search(query="spotify", k=5)) == 1
+
+
+async def test_le_filtre_de_source_sapplique_avant_la_coupe(
+    fake_vector_index: VectorIndex,
+) -> None:
+    """Le point délicat. Filtrer APRÈS la sélection des k meilleurs rendrait
+    moins de k résultats sans le dire — on croirait qu'il n'y a rien de plus à
+    trouver alors que le filtre a simplement mangé les places.
+
+    Ici trois topics mieux notés précèdent le fait ; avec k=1 et le filtre, le
+    fait doit tout de même sortir.
+    """
+    for i in range(3):
+        await fake_vector_index.add(
+            doc_id=f"topic:t{i}.md",
+            text="Spotify musique préférences",
+            metadata={"source": "topic"},
+        )
+    await fake_vector_index.add(
+        doc_id="fait:f1",
+        text="Max utilise Spotify. (outil)",
+        metadata={"source": "fact"},
+    )
+
+    trouves = await fake_vector_index.search(query="spotify", k=1, source="fact")
+    assert [r["doc_id"] for r in trouves] == ["fait:f1"]
+
+
+async def test_le_filtre_sur_une_source_absente_rend_vide(
+    fake_vector_index: VectorIndex,
+) -> None:
+    await fake_vector_index.add(
+        doc_id="topic:music.md", text="Spotify", metadata={"source": "topic"}
+    )
+    assert await fake_vector_index.search(query="spotify", k=5, source="fact") == []
+
+
+async def test_le_retrait_survit_a_la_persistance(
+    fake_vector_index: VectorIndex,
+) -> None:
+    """Le retrait doit atteindre le disque, sinon un redémarrage ramène les faits
+    archivés."""
+    await fake_vector_index.add(
+        doc_id="topic:music.md", text="Spotify", metadata={"source": "topic"}
+    )
+    await fake_vector_index.add(
+        doc_id="fait:f1", text="Max utilise Spotify.", metadata={"source": "fact"}
+    )
+    await fake_vector_index.remove_source("fact")
+    await fake_vector_index.persist()
+
+    recharge = VectorIndex(index_dir=fake_vector_index._dir)
+    recharge._model = _FakeEmbedder()
+    assert [r["doc_id"] for r in await recharge.search(query="spotify", k=5)] == [
+        "topic:music.md"
+    ]
+
+
+async def test_memory_search_garde_une_place_aux_documents(
+    fake_vector_index: VectorIndex,
+) -> None:
+    """RÉGRESSION VERROUILLÉE. Une fois les faits indexés, une recherche unique
+    sur l'index partagé rendait CINQ faits sur cinq pour « comment configurer le
+    DAC PCM5102A » — mesuré sur la base réelle. Les topics et transcriptions
+    avaient disparu de la mémoire consultable : une phrase courte gagne au
+    cosinus contre un paragraphe, quel que soit le sujet.
+
+    L'outil interroge donc les deux réserves séparément. Ici huit faits mieux
+    notés précèdent le seul topic : il doit malgré tout ressortir.
+    """
+    for i in range(8):
+        await fake_vector_index.add(
+            doc_id=f"fait:f{i}",
+            text="Max utilise Spotify pour la musique.",
+            metadata={"source": "fact"},
+        )
+    await fake_vector_index.add(
+        doc_id="topic:music.md",
+        text="Spotify musique : configuration du DAC et du lecteur",
+        metadata={"source": "topic", "filename": "music.md"},
+    )
+
+    tool = MemorySearchTool(vector_index=fake_vector_index)
+    result = await tool.execute(query="spotify musique", k=5)
+
+    assert "music.md" in result.content, result.content
+    assert "Ce que tu sais de lui" in result.content
+    assert "Documents et échanges passés" in result.content
+
+
+async def test_memory_search_rend_toutes_les_places_si_une_reserve_est_vide(
+    fake_vector_index: VectorIndex,
+) -> None:
+    """Le partage du budget ne doit pas coûter des résultats : sans faits en
+    base, les cinq places demandées reviennent aux documents."""
+    for i in range(5):
+        await fake_vector_index.add(
+            doc_id=f"topic:t{i}.md",
+            text="Spotify musique préférences",
+            metadata={"source": "topic", "filename": f"t{i}.md"},
+        )
+
+    tool = MemorySearchTool(vector_index=fake_vector_index)
+    result = await tool.execute(query="spotify musique", k=5)
+
+    assert result.content.count("(score=") == 5
+    assert "Ce que tu sais de lui" not in result.content

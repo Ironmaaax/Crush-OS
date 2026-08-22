@@ -208,6 +208,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # vocale. On ne bloque pas le démarrage de l'API pour autant.
     asyncio.create_task(tts_engine.warmup(), name="tts-warmup")
 
+    # Indexation sémantique des faits, en tâche de fond pour la même raison :
+    # le premier encodage charge le modèle fastembed (~25 s sur le Pi), et faire
+    # attendre l'API pour ça serait absurde. La passe nocturne réindexe de toute
+    # façon ; ce rattrapage évite juste qu'un déploiement laisse les faits
+    # introuvables jusqu'à 3 h du matin.
+    async def _indexer_les_faits() -> None:
+        try:
+            n = await container.fact_index.synchroniser()
+            logger.info("Faits indexés pour la recherche sémantique", nombre=n)
+        except Exception as exc:  # noqa: BLE001 — l'API démarre même sans index
+            logger.warning("Indexation des faits échouée au démarrage", error=str(exc))
+
+    asyncio.create_task(_indexer_les_faits(), name="fact-index-sync")
+
     worker_task = asyncio.create_task(container.worker.run_loop(), name="background-worker")
     container.scheduler.start()
 

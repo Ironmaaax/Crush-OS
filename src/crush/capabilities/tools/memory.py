@@ -250,15 +250,35 @@ class MemoryLoadTopicTool(Tool):
         return ToolResult(content=f"# {nom}\n\n{content}")
 
 
+def _rendre(titre: str, resultats: list[dict]) -> str:
+    """Une section de résultats, source et score visibles.
+
+    Les deux réserves sont TITRÉES séparément : sans ça, le modèle ne peut pas
+    distinguer un fait établi sur l'utilisateur d'un extrait de conversation où
+    la chose a peut-être seulement été évoquée.
+    """
+    lignes = [f"## {titre}"]
+    for i, r in enumerate(resultats, start=1):
+        meta = r.get("metadata", {})
+        source = meta.get("filename") or meta.get("source") or r.get("doc_id", "?")
+        texte = r.get("text", "").strip()
+        lignes.append(f"[{i}] {source} (score={r.get('score', 0.0):.3f})\n{texte}")
+    return "\n\n".join(lignes)
+
+
 class MemorySearchTool(Tool):
     """Recherche sémantique dans la mémoire (topics + transcripts) via embeddings."""
 
     name = "memory_search"
     description = (
-        "Recherche sémantique dans toute la mémoire (fichiers thématiques + transcripts). "
+        "Recherche sémantique dans toute la mémoire : ce que tu sais de l'utilisateur "
+        "(ses préférences, décisions, contraintes, outils, sa façon de communiquer), "
+        "les fichiers thématiques et les transcripts. "
         "Renvoie les passages les plus pertinents pour la requête, avec leur source. "
-        "Utiliser pour retrouver une information mémorisée avant éventuellement d'appeler "
-        "`memory_load_topic` pour le détail complet d'un fichier."
+        "APPELLE CET OUTIL dès qu'une question porte sur lui et que la réponse n'est pas "
+        "déjà dans ton prompt : le prompt ne contient que les faits les plus importants, "
+        "et cette recherche atteint tous les autres. "
+        "Utiliser aussi avant `memory_load_topic` pour identifier le bon fichier."
     )
     input_schema = {
         "type": "object",
@@ -285,17 +305,39 @@ class MemorySearchTool(Tool):
             k_int = max(1, min(20, int(k)))
         except (TypeError, ValueError):
             k_int = 5
-        results = await self._index.search(query=query, k=k_int)
-        if not results:
+        # DEUX RECHERCHES, ET C'EST NÉCESSAIRE.
+        #
+        # L'index est partagé entre les faits (une phrase) et les topics et
+        # transcriptions (des paragraphes). Mesuré sur la base réelle après
+        # l'indexation des faits : « comment configurer le DAC PCM5102A »
+        # rendait cinq faits sur cinq et plus aucun passage de topic — une
+        # phrase courte gagne au cosinus contre un paragraphe, quel que soit le
+        # sujet. Une seule recherche faisait donc disparaître la moitié de la
+        # mémoire.
+        #
+        # On partage le budget au lieu de le doubler : k reste le nombre de
+        # résultats rendus, donc le coût en jetons ne bouge pas.
+        k_faits = max(1, k_int // 2)
+        results_faits = await self._index.search(query=query, k=k_faits, source="fact")
+        results_docs = await self._index.search(
+            query=query, k=k_int - len(results_faits), exclure="fact"
+        )
+        # Une réserve vide rend ses places à l'autre : rien ne justifie de
+        # renvoyer trois résultats quand cinq étaient demandés et disponibles.
+        if not results_faits:
+            results_docs = await self._index.search(query=query, k=k_int, exclure="fact")
+        elif not results_docs:
+            results_faits = await self._index.search(query=query, k=k_int, source="fact")
+
+        if not results_faits and not results_docs:
             return ToolResult(content="Aucun résultat pertinent trouvé en mémoire.")
-        lines: list[str] = []
-        for i, r in enumerate(results, start=1):
-            meta = r.get("metadata", {})
-            source = meta.get("filename") or meta.get("source") or r.get("doc_id", "?")
-            score = r.get("score", 0.0)
-            text = r.get("text", "").strip()
-            lines.append(f"[{i}] {source} (score={score:.3f})\n{text}")
-        return ToolResult(content="\n\n---\n\n".join(lines))
+
+        blocs: list[str] = []
+        if results_faits:
+            blocs.append(_rendre("Ce que tu sais de lui", results_faits))
+        if results_docs:
+            blocs.append(_rendre("Documents et échanges passés", results_docs))
+        return ToolResult(content="\n\n".join(blocs))
 
 
 class CrossSessionRecallTool(Tool):
