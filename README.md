@@ -2,345 +2,342 @@
 
 # CRUSH-OS
 
+**Un assistant personnel qui tourne chez toi, se souvient de toi, et agit pour toi.**
+
 [![CRUSH-OS](https://img.shields.io/badge/crush--OS-main-0A0E16?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Ironmaaax/Crush-OS)
 [![Crush Skills](https://img.shields.io/badge/Crush--skills-plugins-1a1f2e?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Ironmaaax/Crush-skills)
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![WebSocket](https://img.shields.io/badge/WebSocket-voice-F5A623?style=flat-square)](https://developer.mozilla.org/fr/docs/Web/API/WebSockets_API)
-[![Claude](https://img.shields.io/badge/Claude-Anthropic-8B5CF6?style=flat-square)](https://anthropic.com)
+[![Tests](https://img.shields.io/badge/tests-1650-2ea44f?style=flat-square)](#les-cinq-portes-qualité)
+[![Couches](https://img.shields.io/badge/architecture-4_couches_strictes-8B5CF6?style=flat-square)](#architecture)
+
 ![CRUSH-OS](CRUSHINTERFACEGITHUB.png)
 
 </div>
 
 ---
 
-## C'est quoi ?
+## Ce que c'est
 
-Crush est un assistant personnel IA qui tourne en local. Il expose un serveur FastAPI qui gère à la fois une interface de chat texte et un pipeline vocal temps réel (le navigateur pousse son micro sur `/ws/voice`). Il se connecte au LLM de ton choix, mémorise les conversations, utilise des outils (recherche web, Gmail, Google Calendar, Spotify, vision, exécution de code…) et fait tourner des tâches proactives en arrière-plan (alertes météo, digests d'actualités, etc.).
+Crush est un assistant personnel qui tourne sur **ta** machine. Un serveur
+FastAPI unique gère le chat écrit, un pipeline vocal temps réel, une mémoire
+persistante et 28 outils.
 
-**Fonctionnalités principales :**
+Ce qui le distingue d'une interface de chat classique :
 
-- Pipeline vocal temps réel : STT (Whisper/Deepgram) + LLM + TTS (Piper/ElevenLabs), sur un WebSocket direct — pas de serveur média
-- Mémoire vivante (Memory Kernel) : faits atomiques datés, sourcés, renforçables, oubliables, corrigeables ; SQLite source de vérité, miroir Markdown lisible
-- Mission Engine : transforme une demande en mission planifiée, vérifiée à chaque étape (structurelle, déterministe, sémantique), reprise après crash
-- Gouvernance transversale : tout ce qui touche au filesystem ou au réseau passe par un gate composite (risque × catégorie × budget) avec audit immuable
-- Apprentissage : leçon post-mission, Skill Lab (skills nées de l'usage, testées en sandbox Docker, validées par l'humain avant install), Capability Engine pour combler les manques de capacité
-- Proactif gouverné : initiatives à niveau d'autonomie 0-5, Command Center pour les piloter, Curator nocturne qui fait l'entretien (facts/skills/coûts)
-- Utilisation d'outils : navigateur, Gmail, Calendar, Notion, Spotify, runner CLI, filesystem, vision (YOLOv8), météo
-- Multi-LLM : Anthropic Claude, Mistral, Google Gemini, ou modèles Ollama en local
-- UI d'administration : dashboard web, widget globe, Command Center, Skill Lab
+- **Il se souvient vraiment.** Pas un historique de conversation, mais des faits
+  atomiques datés, sourcés, renforcés quand tu les répètes, archivés quand tu les
+  contredis — jamais supprimés.
+- **Il agit.** Lire un fichier, lancer une commande, jouer un morceau, transcrire
+  un vocal, chercher sur le web, piloter ton PC à distance.
+- **Il prend des initiatives**, dans un cadre que tu contrôles (niveaux
+  d'autonomie 0 à 5).
+- **Tout reste chez toi.** SQLite en local, modèles locaux possibles, aucune
+  ressource chargée depuis un tiers dans l'interface.
+
+> **Nouveau ici ?** Le document [**Comment ça marche**](docs/COMMENT_CA_MARCHE.md)
+> explique le fonctionnement interne avec des schémas : le trajet d'un message, la
+> mémoire, les tâches nocturnes, la sécurité.
 
 ---
 
-## Architecture : couches strictes (CDC §2)
+## En un coup d'œil
 
-Depuis la migration `refonte/architecture-couches` (v0.2), le code est
-organisé en **4 couches strictes** validées par
-[import-linter](https://pypi.org/project/import-linter/) en CI. Chaque
-règle est exécutable, pas juste de la convention.
+| | |
+|---|---|
+| **Entrées** | Navigateur (chat + voix), Telegram, agent PC distant, Discord/Slack/Signal/WhatsApp |
+| **Modèles** | Anthropic Claude, OpenAI, Mistral, Google Gemini, ou Ollama en local |
+| **Mémoire** | SQLite (vérité) + index vectoriel (recherche) + miroir Markdown (lecture) |
+| **Outils** | 28, de la lecture de fichier à la création de nouvelles compétences |
+| **Voix** | WebSocket direct — pas de serveur média. Whisper (cloud ou local) + Piper/ElevenLabs |
+| **Cible** | Windows, Linux, macOS. Tourne en permanence sur un Raspberry Pi 5 |
+| **Qualité** | 1650 tests, 4 contrats de couches, 208 routes figées |
+
+---
+
+## Architecture
+
+Le code est organisé en **quatre couches strictes**, vérifiées automatiquement
+par [import-linter](https://pypi.org/project/import-linter/) à chaque validation.
 
 ![Architecture en couches Crush](images/infog1.png)
 
-| Couche | Package | Rôle |
-|---|---|---|
-| **L0** | `kernel/` | `contracts.py` (Protocols), `schemas.py` (dataclasses partagées), `events.py` (bus pub/sub), `settings.py`, `errors.py`, `vocab.py`, `paths.py`, `permissions.py`, `approval.py`, `notifications.py` |
-| **L1** | `providers/` | LLM (`llm/api.py`, `local.py`, `factory.py`), Memory Kernel SQLite (`memory/kernel.py`, `ingest.py`, `mirror.py`, `search.py`), TTS/STT (`audio/`), Vision (`vision/`), AutoDream + ConsolidationAgent + CrossSessionRecall |
-| **L1** | `capabilities/` | Tools (browser, Gmail, Calendar, Notion, Spotify, vision, filesystem, CLI, memory…), Skills (`registry.py`, `lifecycle.py`, `lab.py`, `synthesizer.py`, `executor.py`) |
-| **L1** | `analytics/`, `hardware/` | Widgets analytics (YouTube, projets, etc.), Macropad 2 touches, parsers Bluetooth |
-| **L2** | `engine/` | Gateway, Agent, Router, SessionManager (composition orchestrale), BudgetGuard, UsageTracker, Mission Engine (`mission/orchestrator.py`, `worker_agent.py`, `verifier.py`, `governance.py`, `reflexion.py`, `capability_engine.py`), Proactif (`proactive/engine.py`, `command_center.py`, `curator.py`, collectors), Background (`background/worker.py`, `scheduler.py`, `notifications.py`) |
-| **L3** | `interfaces/`, `app.py`, `bootstrap.py` | `bootstrap.build()` = composition root unique (instancie ~30 objets, câble le bus, vérifie isinstance Protocols), `app.py` (point d'entrée API), `interfaces/api/*.py` (routers FastAPI : chat, budget, memory, proactive, skills, config/{settings,llm,devices,permissions}, sessions, vision, system, …), `interfaces/api/voice_ws.py` (pipeline voix sur WebSocket) |
+```
+L3  interfaces / app / bootstrap    routes HTTP, WebSockets, canaux, câblage
+L2  engine                          Gateway, Agent, missions, moteur proactif
+L1  providers / capabilities        mémoire, LLM, audio, outils
+    analytics / hardware
+L0  kernel                          contrats (Protocol), schémas, réglages
+```
 
-**Garde-fous permanents** (CI lane rapide, à chaque push) :
-
-| Gate | Vérifie |
+| Règle | Ce qu'elle interdit |
 |---|---|
-| `ruff check` | Style + erreurs Python (règles `E W F I B UP ANN ASYNC TID`) |
-| `lint-imports` | 3 contrats `forbidden` qui encodent les RÈGLES 1/2/3 ci-dessus |
-| `mypy` scopé | Conformité des implémentations aux Protocols `kernel.contracts` |
-| `pytest -m "not integration"` | Suite unitaire (~587 tests, < 30s) |
-| `snapshot_routes.py` diff | Les URLs HTTP n'ont pas dévié de la baseline |
+| **RÈGLE 1** | Le `kernel` ne dépend de rien. |
+| **RÈGLE 2** | `providers`, `capabilities`, `analytics`, `hardware` n'importent **que** `kernel`. |
+| **RÈGLE 3** | `engine` n'importe **que** `kernel` — jamais `providers`. |
+| **RÈGLE 4** | Aucun module ne passe par l'ancien dossier `config/`. |
 
-La lane lourde (CI déclenchée sur `main` + scheduled hebdo) installe les
-deps système (`cmake`, `openblas`, `portaudio`, `libgl1`) et lance la
-suite complète, incl. les ~28 tests `@pytest.mark.integration`.
+La RÈGLE 3 est la plus contraignante : le moteur a besoin de la mémoire, qui vit
+dans `providers`. Il y accède par des `Protocol` déclarés dans `kernel/contracts.py`
+et branchés par `bootstrap.py` — la seule couche autorisée à voir les deux côtés.
+
+**Détails et schémas** : [`docs/COMMENT_CA_MARCHE.md`](docs/COMMENT_CA_MARCHE.md#2-les-quatre-couches-et-pourquoi-elles-sont-strictes)
 
 ---
 
 ## Prérequis
 
-Deux profils distincts :
+Deux profils distincts.
 
 ### Utilisateur final (Windows)
 
-Tu clones le dépôt (ou tu décompresses une archive) **sans le dossier `bundle/`** : l'assistant web le télécharge pour toi en un clic (~650 Mo). Tu n'as **pas** besoin d'installer Python, uv, cmake ni Visual C++ sur ta machine, ni d'extraire manuellement une archive offline.
+Tu clones le dépôt (ou décompresses une archive) **sans le dossier `bundle/`** :
+l'assistant web le télécharge pour toi en un clic (~650 Mo). Tu n'as **pas** besoin
+d'installer Python, uv, cmake ni Visual C++.
 
 | Requis | Notes |
 |---|---|
 | Windows 10/11 | |
 | PowerShell | Pour lancer `crush.ps1` |
 | Navigateur web | Configuration sur `http://127.0.0.1:8765/setup` |
-| Connexion internet | Uniquement pour le premier téléchargement du bundle (étape 1 du setup) |
-| Clés API (LLM, etc.) | OpenAI ou Anthropic au minimum, saisies dans l'assistant web |
+| Connexion internet | Uniquement pour le premier téléchargement du bundle |
+| Clé API d'un LLM | Une seule suffit, saisie dans l'assistant web |
 
-Le bundle embarque : un Python 3.11 **autonome et relocalisable** (`bundle/python`), un environnement virtuel (`bundle/.venv`), les dépendances Python, les modèles ML (YOLO, Piper) et `uv.exe`. Au premier `setup`, l'environnement est automatiquement ré-ancré sur la machine cible (aucun chemin absolu de la machine de build n'est requis).
+Le bundle embarque un Python 3.11 **autonome et relocalisable**
+(`bundle/python`), son environnement virtuel, les dépendances, les modèles ML
+(YOLO, Piper) et `uv.exe`. Au premier `setup`, l'environnement est
+automatiquement ré-ancré sur la machine cible.
 
-> **Release offline pré-construite** : si ton archive contient déjà `bundle/`, le bouton Télécharger n'apparaît pas — tu passes directement à la configuration.
+> **Release offline pré-construite** : si ton archive contient déjà `bundle/`, le
+> bouton Télécharger n'apparaît pas — tu passes directement à la configuration.
 
-### Développeur : construire le bundle
-
-Une seule fois, **avec réseau**, pour produire `bundle/` (release ou usage local sans clone vide).
-
-| Outil | Version | Notes |
-|---|---|---|
-| [uv](https://docs.astral.sh/uv/) | latest | Télécharge un Python 3.11 relocalisable dans `bundle/python` + venv `bundle/.venv` |
-| Réseau | | Téléchargement des deps, modèles et binaires |
-
-Python système **n'est pas requis** : le script de build l'intègre au bundle.
-
-### Modules optionnels (hors install de base)
+### Développeur
 
 | Outil | Notes |
 |---|---|
-| [Docker](https://docs.docker.com/) | Code-agent, bac à sable du Skill Lab |
-| Docker | Code-agent, Skill Lab sandbox |
-| `uv sync --extra vision` | Détection d'objets YOLOv8 + OpenCV. **Déjà inclus dans le bundle Windows**, à installer seulement pour un parcours de développement |
-| `uv sync --extra face` | Reconnaissance faciale — `dlib` compile depuis les sources ; sur Windows, peut exiger [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (workload C++) |
-| `nowplaying-cli` | macOS uniquement, lecture locale « now playing » |
+| [uv](https://docs.astral.sh/uv/) | Télécharge un Python 3.11 relocalisable + crée le venv |
+| Réseau | Pour les dépendances, modèles et binaires |
+
+Python système **n'est pas requis** : le script de build l'intègre au bundle.
+
+### Modules optionnels
+
+| Module | Notes |
+|---|---|
+| [Docker](https://docs.docker.com/) | Bac à sable du Skill Lab et de l'agent de code. **En mode rootless** — voir [Sécurité](#sécurité) |
+| `uv sync --extra vision` | Détection d'objets YOLOv8 + OpenCV. Déjà inclus dans le bundle Windows |
+| `uv sync --extra face` | Reconnaissance faciale — `dlib` compile depuis les sources ; sur Windows peut exiger [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
+| `faster-whisper` | Transcription **locale**, repli quand le cloud est indisponible. Fortement recommandé — sans lui, un quota épuisé supprime la voix au lieu de la dégrader |
+| `nowplaying-cli` | macOS uniquement, lecture « now playing » |
 
 ---
 
 ## Installation
 
-### Parcours A : Utilisateur final (Windows)
+### Parcours A — Utilisateur final (Windows)
 
-**Clone Git ou archive sans `bundle/`** : à l'étape 1 du setup, clique sur **Télécharger** — le wizard récupère l'archive (~650 Mo), l'extrait dans `bundle/` et vérifie les prérequis. **Aucune extraction manuelle.** **Release avec `bundle/` déjà inclus** : le bouton n'apparaît pas, tu passes directement à la configuration.
-
-> **OneDrive interdit.** Ne place pas `crush-OS` dans OneDrive (Documents synchronisés, etc.) : OneDrive casse les liens symboliques du venv Python embarqué. Au premier lancement, Crush **bloque l'installation** et propose soit un **déplacement automatique** vers un dossier local (Documents hors sync, ou `%USERPROFILE%\crush-OS`), soit des instructions pour déplacer manuellement puis relancer `setup.bat`.
-
-Le plus simple : **double-clique sur `setup.bat`**, puis sur `run.bat`. Ou en ligne de commande :
+Le plus simple : **double-clique sur `setup.bat`**, puis sur `run.bat`. En ligne
+de commande :
 
 ```powershell
-# 1. Cloner ou décompresser, puis ouvrir le dossier (hors OneDrive)
+# 1. Ouvrir le dossier (hors OneDrive — voir l'avertissement ci-dessous)
 cd C:\crush-OS
 
-# 2. Configuration web (navigateur — étape 1 : Télécharger si bundle/ absent)
+# 2. Configuration web (télécharge le bundle si absent)
 .\crush.bat setup
 
 # 3. Démarrage
 .\crush.bat run
 ```
 
-> **Pourquoi `.bat` et pas `.ps1` ?** Windows bloque par défaut l'exécution des scripts
-> PowerShell téléchargés (`l'exécution de scripts est désactivée sur ce système`). Les
-> lanceurs `.bat` contournent ça proprement (ils appellent `crush.ps1` en
-> `-ExecutionPolicy Bypass`). Si tu préfères les `.ps1` directement, autorise-les une
-> fois : `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` puis
-> `Get-ChildItem -Recurse *.ps1 | Unblock-File`.
+> **OneDrive interdit.** OneDrive casse les liens symboliques du venv Python
+> embarqué. Au premier lancement, Crush **bloque l'installation** et propose un
+> déplacement automatique vers un dossier local.
 
-L'assistant web configure l'identité, les clés API, les modules optionnels et la photo de référence. Une fois terminé, l'interface admin est sur `http://127.0.0.1:<PORT>/admin` (`PORT` dans `.env`, souvent `8000`).
+> **Pourquoi `.bat` et pas `.ps1` ?** Windows bloque par défaut l'exécution des
+> scripts PowerShell téléchargés. Les lanceurs `.bat` appellent `crush.ps1` en
+> `-ExecutionPolicy Bypass`. Pour utiliser les `.ps1` directement :
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` puis
+> `Get-ChildItem -Recurse *.ps1 | Unblock-File`.
 
 | Commande | Rôle |
 |---|---|
-| `.\crush.ps1 setup` | Assistant de configuration (`:8765`) — téléchargement bundle intégré |
-| `.\crush.ps1 run` | API — chat et vocal, le vocal étant servi sur `/ws/voice` |
+| `.\crush.ps1 setup` | Assistant de configuration (port 8765) |
+| `.\crush.ps1 run` | API — chat et vocal (`/ws/voice`) |
 | `.\crush.ps1 api` | Serveur FastAPI seul |
-| `.\crush.ps1 doctor` | Diagnostic rapide |
+| `.\crush.ps1 doctor` | Diagnostic |
 
-Le log du run est dans `%TEMP%\crushpi.log`. `.\crush.ps1 run` tue les process résiduels puis réinitialise ce fichier à chaque démarrage.
+Le log du run est dans `%TEMP%\crushpi.log`, réinitialisé à chaque démarrage.
 
-### Parcours B : Construire le bundle (développeur)
+### Parcours B — Construire le bundle (développeur)
 
-À faire **une fois**, avec réseau, avant de distribuer ou d'utiliser le parcours A.
-
-**Windows :**
+À faire **une fois**, avec réseau.
 
 ```powershell
+# Windows
 git clone https://github.com/Ironmaaax/Crush-OS.git
 cd Crush-OS
 .\scripts\release\build_bundle.ps1
 .\crush.ps1 setup
 ```
 
-**Linux / macOS :**
-
 ```bash
+# Linux / macOS
 git clone https://github.com/Ironmaaax/Crush-OS.git
 cd Crush-OS
 bash scripts/release/build_bundle.sh
 ./crush eclosion
 ```
 
-Le script crée `bundle/` : `.venv`, modèles, `manifest.json`. Ensuite, la configuration et le démarrage suivent le même flux que le parcours A (sans nouveau téléchargement).
-
-### Parcours C : Développement sans bundle (Linux / macOS / Windows)
-
-Installation classique avec uv sur la machine (téléchargements à chaque `uv sync`) :
+### Parcours C — Développement sans bundle
 
 ```bash
 uv sync
-# reconnaissance faciale optionnelle :
-uv sync --extra vision
-# assets front lourds (MediaPipe + modèles, ~64 Mo) :
-python scripts/vendor_assets.py
+uv sync --extra vision                  # optionnel
+python scripts/vendor_assets.py         # assets front (~64 Mo)
 ```
 
-Puis `./crush eclosion` ou `.\crush.ps1 setup` selon l'OS.
+Puis `./crush eclosion` ou `.\crush.ps1 setup`.
 
 > **Assets front.** L'interface ne charge **aucune ressource depuis un tiers** :
-> polices, `three`, `gsap` et `mermaid` sont versionnés dans le dépôt, et les
+> polices, `three`, `gsap` et `mermaid` sont versionnés dans le dépôt. Les
 > runtimes WebAssembly de MediaPipe (~64 Mo, trop lourds pour git) sont récupérés
-> par `scripts/vendor_assets.py`. Chaque fichier est épinglé à une version exacte
-> et vérifié par empreinte SHA-256 (`scripts/vendor_assets.lock.json`) au
-> téléchargement **et** à chaque démarrage. Sans ces assets l'assistant tourne
-> normalement ; seules la reconnaissance faciale, la séquence de réveil et la
-> détection de gestes sont indisponibles. `--check` vérifie sans rien télécharger.
+> par `scripts/vendor_assets.py`, chaque fichier épinglé à une version exacte et
+> vérifié par empreinte SHA-256 au téléchargement **et** à chaque démarrage.
 
-> **Serveur distant / headless (VPS, conteneur) :** la détection de double-clap
-> (`CLAP_DETECTION_ENABLED`) et le pipeline vocal local écoutent le micro **de la
-> machine qui héberge Crush**. Sur un VPS sans périphérique audio, ces fonctions
-> ne se déclenchent jamais (un avertissement explicite est désormais logué au
-> démarrage). Mets `CLAP_DETECTION_ENABLED=false` dans `.env` pour ce type d'install.
+> **Serveur headless (VPS, conteneur)** : la détection de double-clap et le micro
+> local écoutent le périphérique audio de la machine hôte. Sur un serveur sans
+> audio, mets `CLAP_DETECTION_ENABLED=false` dans `.env`.
 
----
-
-### Démarrage (rappel)
-
-**Windows :**
-
-```powershell
-.\crush.ps1 run
-.\crush.ps1 api
-```
-
-**Linux / macOS :**
+### Parcours D — Raspberry Pi (service permanent)
 
 ```bash
-crush run
-crush voice
+bash scripts/install_pi.sh
 ```
 
-Le port par défaut est `8000` ; l'assistant en choisit un autre si occupé (vérifie `PORT` dans `.env`).
-
-Les deux peuvent tourner simultanément : le voice agent délègue au gateway du serveur principal, donc ils partagent la même session, la même mémoire et les mêmes outils.
+Le script installe l'environnement, le moteur de transcription local, les unités
+systemd (API, surveillance de santé, sauvegarde hors machine) et les active.
 
 ---
 
 ## Configuration
 
-Tout est configuré via l'assistant web (`.\crush.ps1 setup` ou `./crush eclosion`). Pour modifier une clé après coup, édite `.env` à la racine du projet.
+Tout passe par l'assistant web. Pour modifier après coup, édite `.env` — chaque
+réglage y est documenté dans [`.env.example`](.env.example).
 
-**Choix du backend LLM (`API_BACKEND`) :** une seule clé est requise, celle du backend choisi. Anthropic n'est PAS obligatoire.
+### Choix du modèle
+
+Une seule clé est requise, celle du backend choisi. **Anthropic n'est pas
+obligatoire.**
 
 | `API_BACKEND` | Clé requise | Notes |
 |---|---|---|
-| `anthropic` | `ANTHROPIC_API_KEY` | Le vocal in-house utilise `VOICE_ANTHROPIC_MODEL`. |
-| `openai` | `OPENAI_API_KEY` | `ANTHROPIC_API_KEY` peut rester à sa valeur d'exemple. Function calling supporté. |
-| `mistral` | `MISTRAL_API_KEY` | Function calling supporté. |
-| `local` (`LLM_PROVIDER=local`) | aucune | Ollama local. |
+| `anthropic` | `ANTHROPIC_API_KEY` | |
+| `openai` | `OPENAI_API_KEY` | Appels d'outils supportés |
+| `mistral` | `MISTRAL_API_KEY` | Appels d'outils supportés |
+| `local` | aucune | Ollama en local |
 
-Le backend choisi pilote le chat texte et les tâches background (mémoire, consolidation, auto-dream) ; aucune dépendance Anthropic n'est forcée si `API_BACKEND` n'est pas `anthropic`. La voix suit le même backend (ci-dessous).
+### Le réglage à ne pas manquer
 
-**Pipeline vocal temps réel :** il vit **dans l'API**. Le navigateur publie son micro sur `/ws/voice` ; l'API transcrit (`providers/audio/stt.py`), répond via le Gateway et renvoie l'audio (`providers/audio/tts.py`). Aucun serveur média, aucun périphérique audio requis côté serveur. Surcharge du modèle possible via `VOICE_LLM_MODEL`.
+`ENVIRONMENT` **n'est pas cosmétique** — il commande deux choses :
 
-**Intégrations Google (Gmail / Calendar) :** place ton `credentials.json` issu de Google Cloud Console dans `config/google_credentials.json`, puis démarre Crush, il ouvrira le flux d'authentification OAuth et sauvegardera les tokens en local (ils sont gitignorés).
+1. Le **rechargement automatique** du code. En service permanent, il ajoute un
+   processus surveillant (~170 Mo mesurés sur un Pi 5) et recharge l'application
+   dès qu'un fichier bouge, y compris en pleine copie pendant un déploiement.
+2. Le drapeau **`Secure`** du cookie de session. Sans lui, le cookie voyage aussi
+   en HTTP clair.
 
-**Reconnaissance faciale (séquence Wake Up) :** pour que le scan biométrique te reconnaisse, place une photo de toi (format JPG, visage bien visible, bonne luminosité) dans :
+**La règle** : `development` tant que l'accès se fait en `http://` (premier
+démarrage local) ; `production` **dès que** l'accès passe par `https://`. Basculer
+avant d'avoir HTTPS casse la connexion — le navigateur refuse d'envoyer un cookie
+`Secure` sur une page non chiffrée.
 
-```
-vision_data/faces/reference.jpg
-```
+### Intégrations
 
-Sans cette photo, la séquence de scan s'exécute mais retourne toujours "identité non reconnue". Le dossier `vision_data/faces/` est gitignoré. L'upload est possible depuis l'assistant de configuration (`/setup`).
-
-Pour activer la reconnaissance faciale :
-
-```bash
-uv sync --extra vision
-# FACE_RECOGNITION_ENABLED=true dans .env
-```
+- **Google (Gmail / Calendar)** : place ton `credentials.json` dans
+  `config/google_credentials.json`. Crush ouvrira le flux OAuth au démarrage et
+  gardera les jetons en local (gitignorés).
+- **Reconnaissance faciale** : place une photo dans
+  `vision_data/faces/reference.jpg` (dossier gitignoré), puis
+  `FACE_RECOGNITION_ENABLED=true`.
+- **Telegram** : voir [la section dédiée](#telegram--laccès-mobile).
 
 ---
 
-## Outils disponibles
+## Les 28 outils
 
-| Outil | Description |
+| Domaine | Outils |
 |---|---|
-| `browser` | Recherche web + scraping de pages |
-| `gmail` | Lister les emails récents |
-| `calendar` | Lister / créer des événements Google Calendar |
-| `spotify` | Contrôle de lecture |
-| `notion` | Rechercher et lire des pages |
-| `weather` | Météo actuelle (Open-Meteo, sans clé API) |
-| `vision` | Capture d'écran + détection d'objets YOLOv8 |
-| `filesystem` | Lire des fichiers, chercher par pattern |
-| `cli` | Lancer des commandes shell whitelistées (configurées dans `config/tools.yaml`) |
-| `memory` | Écrire des notes structurées dans le topic store |
+| **Mémoire** | `memory_search`, `memory_write`, `memory_load_topic`, `memory_journal`, `session_recall` |
+| **Monde extérieur** | `browser`, `get_weather`, `list_emails`, `list_calendar_events`, `create_calendar_event`, `notion_tasks`, `spotify_control` |
+| **Machine** | `read_file`, `find_files`, `execute_cli`, `run_script`, `execute_script`, `remote_pc` |
+| **Perception** | `vision` (YOLOv8), `transcribe_audio` |
+| **Auto-évolution** | `skill_create`, `skill_improve`, `skill_list`, `spawn_subagent`, `report_missing_capability` |
+| **Pilotage** | `show_view`, `initiatives`, `execute_preset` |
+
+Les outils qui touchent au système de fichiers ou au réseau passent par un
+contrôle de permission et un périmètre de répertoires autorisés
+(`FILE_SEARCH_ROOTS`). Le détail des refus est
+[documenté avec un schéma](docs/COMMENT_CA_MARCHE.md#6-les-outils--28-capacités).
 
 ---
 
-## Système de mémoire
+## La mémoire
 
-Crush ne mémorise pas en vrac : il **extrait des faits atomiques** (« Max vise un marathon sub-3h »), les **date**, les **source** (quel échange l'a produit), les **renforce** quand il les ré-entend, les **archive** quand ils sont contredits, sans jamais les supprimer. Une base SQLite unique est la source de vérité ; un miroir Markdown lisible (compatible Obsidian) en donne une vue inerte.
+Crush ne mémorise pas en vrac. Il extrait des **faits atomiques** — *sujet,
+prédicat, objet* — les date, les source, les renforce, et les archive quand ils
+sont contredits.
 
-| Table | Ce qu'elle contient |
-|---|---|
-| `events` | Log immuable de tout ce qui arrive (échanges, observations, leçons de mission) |
-| `facts` | Claims atomiques avec prédicat/catégorie issus d'un vocabulaire fermé, statut (`active`/`superseded`/`needs_review`…), confiance, decay par catégorie |
-| `fact_observations` | Renforcement sans duplication : chaque ré-observation crée une trace au lieu d'ajouter un doublon |
-| `fact_relations` | Liens entre facts (`supersedes`, `contradicts`, `supports`, `related_to`) |
-
-Le miroir Markdown est **unidirectionnel** : la DB génère `user/preferences.md`, `user/projects.md`, `user/goals.md`, `crush/persona.md`, etc., pour inspection. Éditer un `.md` ne modifie pas la mémoire ; pour corriger un souvenir, Crush crée un événement `human_correction` qui met la DB à jour.
-
-Chaque nuit, **AutoDream** + **ConsolidationAgent** repassent sur les sessions récentes pour en extraire les facts manqués en temps réel.
-
-Tout vit dans `memory_data/` (DB `crush_memory.db`, vault `topics/` lisible, sessions, conso, initiatives). Le dossier est gitignored ; la mémoire reste sur ta machine.
-
----
-
-## Dashboard Monde (World Monitor)
-
-L'onglet **Intel Monde** de l'interface Crush affiche [World Monitor](https://github.com/Ironmaaax/dashboard_monde), un tableau de bord géopolitique temps réel (globe 3D, flux d'actualités IA, radars financiers, suivi d'infrastructures).
-
-**Prérequis :** Node.js 18+
-
-```bash
-git clone https://github.com/Ironmaaax/dashboard_monde.git
-cd dashboard_monde
-npm install
-npm run dev -- --port 3000
+```
+max  prefers  concision   (preference, confiance 0.75, vu 2 fois)
+max  is       cergy       (identity,   confiance 0.55, vu 1 fois)
 ```
 
-Une fois lancé sur `http://localhost:3000`, l'onglet Intel Monde de Crush l'affiche automatiquement via iframe. Les deux serveurs peuvent tourner simultanément.
+| Forme | Rôle |
+|---|---|
+| **SQLite** `crush_memory.db` | **Source de vérité unique.** Quatre tables : `events`, `facts`, `fact_observations`, `fact_relations` |
+| **Index vectoriel** | Recherche sémantique. Régénéré depuis SQLite |
+| **Miroir Markdown** | Lecture seule, compatible Obsidian. Régénéré depuis SQLite |
 
-> World Monitor fonctionne sans aucune variable d'environnement pour un usage de base. Des clés API optionnelles (Groq, OpenRouter…) permettent d'activer les fonctionnalités IA avancées, voir le `.env.example` du repo.
+**Rien n'est jamais supprimé.** Un fait contredit passe en `superseded` et reste
+relié à son remplaçant : l'historique est vérifiable.
+
+Le miroir est **unidirectionnel** — éditer un `.md` ne change pas la mémoire. Pour
+corriger un souvenir depuis ton téléphone, une **boîte de réception** accepte des
+consignes en langage naturel (« non, je préfère le thé »), lues par la passe
+nocturne.
+
+**Comment un fait naît, vit et meurt** :
+[schéma détaillé](docs/COMMENT_CA_MARCHE.md#5-comment-un-fait-naît-vit-et-meurt).
 
 ---
 
-## Moteur proactif
+## Le moteur proactif
 
-Crush ne « pousse pas juste des notifs » : il **entreprend des initiatives gouvernées**. Chaque initiative porte un déclencheur, un objectif, un coût max (tokens/temps/argent), un niveau d'autonomie (0 = répondre seulement → 5 = publier/payer/contacter, validation humaine obligatoire), et un état suivi en continu.
+Crush peut entreprendre sans qu'on le lui demande, dans un cadre explicite. Chaque
+initiative porte un déclencheur, un objectif, un coût maximum et un **niveau
+d'autonomie de 0 à 5** — de « répondre seulement » à « publier / payer /
+contacter », ce dernier exigeant toujours une validation humaine.
 
-- **Collectors** (`proactive/collectors/`) : captent les signaux : météo (briefing + alertes sévères), actualités (digest RSS), trackers personnalisables. Étends-les en ajoutant un fichier dans le dossier.
-- **Command Center** (`proactive/command_center.py`) : la vue unifiée de toutes les initiatives et missions en cours : objectifs, budgets, permissions, heartbeat, coûts. Crush ne « fait pas des trucs », il gère des workstreams.
-- **Curator nocturne** (`proactive/curator.py`) : job de maintenance qui produit chaque nuit un rapport et propose des patches : facts ajoutés/contradictoires, skills inutilisées à archiver, prompts qui ont dérivé, coûts du jour, erreurs récurrentes. Il **propose**, l'humain valide pour tout ce qui dépasse le gate (cf. gouvernance).
-- **Gouvernance** : toute initiative niveau ≥ 3 (exécution sandboxée), 4 (modification de fichiers projet) ou 5 (publication/paiement/contact) passe par le gate composite avant agir, comme n'importe quel step de mission.
+- **Collecteurs** — captent les signaux : météo, actualités, trackers
+  personnalisés. Extensibles en ajoutant un fichier.
+- **Command Center** — la vue unifiée : objectifs, budgets, permissions, coûts.
+- **Curator nocturne** — produit un rapport et **propose** des correctifs : faits
+  contradictoires, compétences inutilisées, prompts qui ont dérivé.
+
+Les initiatives arrivent sur Telegram avec des boutons — tu réponds d'un appui.
 
 ---
 
-## Telegram : accès mobile
+## Telegram : l'accès mobile
 
-Crush est accessible depuis n'importe où via un bot Telegram. Même LLM, même mémoire, mêmes outils, juste depuis ton téléphone.
+Même modèle, même mémoire, mêmes outils, depuis ton téléphone.
 
-**1. Créer le bot**
-
-Ouvre Telegram → cherche `@BotFather` → `/newbot` → choisis un nom et un username (doit finir par `bot`). BotFather te donne un token.
-
-**2. Récupérer ton user ID**
-
-Cherche `@userinfobot` sur Telegram → envoie n'importe quel message → il te répond avec ton ID numérique.
-
-**3. Configurer le `.env`**
+1. **Créer le bot** — `@BotFather` → `/newbot`. Il te donne un token.
+2. **Ton identifiant** — `@userinfobot` → envoie un message, il répond ton ID.
+3. **Configurer** :
 
 ```env
 TELEGRAM_BOT_TOKEN=7xxxxxxxxx:AAF...
@@ -348,92 +345,175 @@ TELEGRAM_OWNER_ID=123456789
 TELEGRAM_ENABLED=true
 ```
 
-**4. Lancer Crush** : les logs affichent `Telegram bot démarré`. Ouvre le chat avec ton bot et envoie `/start`.
-
-**Commandes disponibles**
+4. **Lancer**, puis `/start` dans le chat avec ton bot.
 
 | Commande | Action |
 |---|---|
-| `/start` | Message de bienvenue + liste des commandes |
-| `/status` | État de tous les composants (Crush Doctor) |
-| `/initiatives` | Initiatives en attente dans le Command Center |
+| `/start` | Bienvenue + commandes |
+| `/status` | État de tous les composants |
+| `/initiatives` | Initiatives en attente |
 | `/help` | Aide complète |
-| Message libre | Parle à Crush normalement |
+| Message libre | Parle normalement |
 
-**Sécurité** : seul ton `TELEGRAM_OWNER_ID` est autorisé. Tout autre compte reçoit `⛔ Accès non autorisé.` et n'est pas traité.
+**Sécurité** : seul ton `TELEGRAM_OWNER_ID` est autorisé. Tout autre compte est
+refusé sans traitement.
+
+> Ne lance pas Telegram sur deux machines à la fois : deux interrogations longues
+> sur le même token s'excluent mutuellement.
 
 ---
 
-## Surveillance : être prévenu quand ça tombe
+## Sécurité
 
-Rien ne signalait une panne : il fallait s'en apercevoir soi-même. Deux mécanismes
-complémentaires, installés par `install_pi.sh`, couvrent deux pannes différentes.
+Les choix qui comptent, sur une installation exposée (Pi, VPS) :
 
-**`crush-sante.timer`** interroge l'API toutes les 5 minutes et lit le compteur de
-redémarrages de systemd. Il attrape ce que systemd ne voit pas : un process vivant
-mais qui ne répond plus, et une boucle de redémarrage sous la limite d'échecs.
+- **L'application n'écoute que sur `127.0.0.1`.** Tout l'accès passe par un proxy
+  chiffré — [Tailscale](https://tailscale.com) dans l'installation de référence.
+- **Cookie de session** `Secure` + `HttpOnly` + `SameSite=strict`.
+- **Docker en mode rootless.** Le code écrit par le modèle s'exécute dans un bac à
+  sable, et le compte qui le lance n'est **pas** dans le groupe `docker` — cette
+  appartenance équivaut à un accès root complet.
+- **Les clés n'entrent jamais dans une archive.** Le module de sauvegarde filtre
+  `.env`, `*.pem`, `*.key` et les fichiers de jetons, même hors du périmètre
+  archivé : « hors périmètre » est une propriété accidentelle, pas une garantie.
+- **La clé de sauvegarde ne peut rien exécuter** — restreinte à `internal-sftp`,
+  elle ne donne aucun accès à un terminal même si elle est volée.
+- **Authentification obligatoire** dès que la machine est joignable d'ailleurs :
+  `API_AUTH_ENABLED=true`.
 
-**`crush-alerte@`** est branché en `OnFailure=` par un drop-in. `crush-api` porte
-`Restart=always` mais aussi `StartLimitBurst=5` : au-delà de 5 échecs en 5 minutes,
-systemd renonce, et c'est ce moment précis que cette unité signale.
+---
 
-Les alertes partent par Telegram, via `scripts/alerte.sh` — du bash et `curl`, sans
-dépendance à l'application, qui peut justement être en panne. L'alerte ne se déclenche
-que sur les **transitions** : un message quand ça tombe, un quand ça revient. Un
-contrôle toutes les 5 minutes sur un service mort enverrait douze messages par heure,
-et la première réaction serait de couper les notifications.
+## Déploiement et surveillance
+
+### Déployer
 
 ```bash
-bash scripts/sante.sh --etat   # ce que la surveillance retient, sans rien envoyer
-bash scripts/alerte.sh "test"  # vérifier que le canal fonctionne
+scripts/deploiement_pi.sh              # tout ce que git voit de modifié
+scripts/deploiement_pi.sh src/crush/app.py   # une liste explicite
 ```
 
-**Ce que ça ne couvre pas** : la machine éteinte. Rien tournant sur la Pi ne peut le
-signaler — il faut un observateur extérieur.
+Le script envoie, redémarre **explicitement**, attend la santé HTTP, puis compare
+les sommes SHA-256. Il vérifie le droit de redémarrage **avant** d'envoyer : sinon
+on écrase les fichiers puis on découvre qu'on ne peut pas les activer, et le
+service tourne sur l'ancien code sans que rien ne le dise.
+
+### Être prévenu quand ça tombe
+
+| Unité | Ce qu'elle attrape |
+|---|---|
+| `crush-sante.timer` | Toutes les 5 min : API muette, boucle de redémarrage sous la limite |
+| `crush-alerte@` | Branché en `OnFailure=` : le moment où systemd renonce |
+| `crush-offsite-backup.timer` | Toutes les 2 h : pousse la sauvegarde hors machine |
+| `crush-offsite-backup-check.timer` | Toutes les 6 h : alerte si > 72 h sans copie réussie |
+
+**Le principe : on signale les transitions, jamais les états.** Un contrôle toutes
+les 5 minutes sur un service en panne enverrait douze messages par heure — et la
+première réaction serait de couper les notifications, donc de perdre l'alerte
+utile.
+
+Les scripts de surveillance sont en **bash**, pas en Python : ils sont appelés
+précisément quand l'application est en panne.
+
+```bash
+bash scripts/sante.sh --etat                  # ce que la surveillance retient
+bash scripts/offsite_backup_check.sh --etat   # âge de la dernière copie
+bash scripts/alerte.sh "test"                 # vérifier le canal
+```
+
+**Ce que ça ne couvre pas** : la machine éteinte. Rien tournant *sur* la machine
+ne peut le signaler.
 
 ---
 
+## Les cinq portes qualité
+
+Rien n'est déployé sans que les cinq passent.
+
+```bash
+make lint       # ruff + import-linter
+make typecheck  # mypy
+make test       # pytest
+```
+
+| # | Porte | Vérifie |
+|---|---|---|
+| 1 | `ruff check` | Style, lignes ≤ 100, annotations exigées |
+| 2 | `import-linter` | Les 4 contrats de couches |
+| 3 | `mypy` | Conformité des `Protocol` au démarrage |
+| 4 | `pytest` | **1650 tests** (hors intégration) |
+| 5 | `snapshot_routes` | Les **208 routes HTTP** identiques à la référence |
+
+Plus un démarrage réel :
+
+```bash
+python scripts/validation/smoke_runtime.py --fake-llm   # doit afficher BOOT OK
+```
+
+La cinquième porte existe parce qu'une refonte peut casser une route sans qu'aucun
+test ne le voie. La liste est figée dans un fichier de référence.
+
+---
 
 ## Développement
 
 ```bash
-# Tests + lint + typecheck en un coup (Makefile)
-make test       # uv run pytest -q
-make lint       # ruff + lint-imports
-make typecheck  # mypy scopé kernel + conformité Protocols
+# En un coup
+make test lint typecheck
 
 # Détail
-uv run pytest -m "not integration" -q   # suite unit rapide
-uv run pytest -q                         # suite complète
-uv run ruff check
-uv run ruff format
-uv run lint-imports                      # contrat de couches CDC §2
-uv run mypy                              # mypy scopé kernel
+uv run pytest -m "not integration" -q
+uv run ruff check && uv run ruff format
+uv run lint-imports
+uv run mypy
 
 # Test LLM manuel
 uv run python scripts/test_llm.py --stream
 uv run python scripts/test_llm.py --provider mistral
-
-# Validation manuelle des phases [LOCAL] (cf. CDC §0.5)
-uv run python scripts/validation/phase{1..6}_real_*.py
 ```
 
-Documentation architecture détaillée : [`docs/architecture/`](docs/architecture/)
-(CDC complet, events bus, ABI skills). Backlog migration et résidus
-documentés en [`docs/migration/BACKLOG.md`](docs/migration/BACKLOG.md).
+> Si `uv run lint-imports` échoue avec « Failed to canonicalize script path »
+> (lanceur cassé sous Windows), utilise l'API Python directement — voir
+> [`docs/architecture/`](docs/architecture/).
+
+---
+
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [**Comment ça marche**](docs/COMMENT_CA_MARCHE.md) | Le fonctionnement interne, avec schémas |
+| [`.specify/memory/constitution.md`](.specify/memory/constitution.md) | Les principes non négociables |
+| [`docs/architecture/`](docs/architecture/) | Cahier des charges, bus d'événements, ABI des compétences |
+| [`.env.example`](.env.example) | Tous les réglages, documentés |
+| [`docs/migration/BACKLOG.md`](docs/migration/BACKLOG.md) | Résidus de migration |
+
+---
+
+## Dashboard Monde (optionnel)
+
+L'onglet **Intel Monde** affiche
+[World Monitor](https://github.com/Ironmaaax/dashboard_monde), un tableau de bord
+géopolitique temps réel (globe 3D, flux d'actualités, radars financiers).
+
+```bash
+git clone https://github.com/Ironmaaax/dashboard_monde.git
+cd dashboard_monde && npm install && npm run dev -- --port 3000
+```
+
+Node.js 18+ requis. Une fois lancé, l'onglet l'affiche automatiquement.
 
 ---
 
 ## Stack technique
 
-- **Python 3.11** : async / FastAPI / uvicorn
-- **LLM au choix** via `API_BACKEND` : Anthropic Claude, OpenAI, Mistral, ou Ollama en local (une seule clé requise)
-- **WebSocket** : pipeline vocal temps réel, intégré à l'API
-- **Deepgram** : STT cloud / **faster-whisper** : STT local
-- **Piper** : TTS local / **ElevenLabs** : TTS cloud
-- **YOLOv8** (ultralytics) : détection d'objets pour l'outil vision
-- **pydantic-settings** : configuration typée
-- **loguru** : logging structuré
-- **uv** : gestion des dépendances
-
----
+- **Python 3.11** — async, FastAPI, uvicorn
+- **LLM au choix** — Anthropic, OpenAI, Mistral, Gemini, Ollama
+- **WebSocket** — pipeline vocal temps réel, intégré à l'API
+- **faster-whisper** (local) / **Deepgram**, **OpenAI Whisper** (cloud) — transcription
+- **Piper** (local) / **ElevenLabs** (cloud) — synthèse vocale
+- **fastembed** — embeddings multilingues ONNX, 384 dimensions, hors ligne
+- **YOLOv8** — détection d'objets
+- **SQLite** + **FTS5** — mémoire et recherche plein texte
+- **pydantic-settings** — configuration typée
+- **loguru** — journalisation structurée
+- **uv** — gestion des dépendances
