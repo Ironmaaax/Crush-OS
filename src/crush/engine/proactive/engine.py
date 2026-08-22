@@ -49,6 +49,13 @@ class ProactiveAuditEvent:
 _ORDRE_PRIORITE = {Priority.LOW: 0, Priority.MEDIUM: 1, Priority.HIGH: 2}
 
 
+# Au-dela de ce nombre d'initiatives en attente, on cesse d'en produire. Choisi
+# a partir de l'observe : 25 en attente et 44 rejets sur 76 en sept jours, donc
+# une file qui a largement depasse ce qu'un humain traite. Douze tient sur un
+# ecran de telephone sans faire defiler.
+_FILE_PLEINE = 12
+
+
 def _dans_le_silence(maintenant: time, plage: str) -> bool:
     """Sommes-nous dans la plage de silence ? Une plage illisible ne bâillonne rien.
 
@@ -209,7 +216,26 @@ class ProactiveEngine:
                 )
                 await asyncio.sleep(wait)
 
-            initiatives = await self._generator.generate(state)
+            # Le générateur voit désormais ce qui attend déjà et ce qui a été
+            # rejeté. Sans ça il repartait du seul état du monde, toutes les trois
+            # heures, et redécouvrait les mêmes choses.
+            historique = self._historique()
+
+            # ARRÊTER D'AJOUTER À UNE FILE PLEINE. Huit cycles par jour à cinq
+            # initiatives, c'est quarante par jour dans une file que rien ne vide :
+            # elle ne peut que croître, et une file qui croît est une file qu'on
+            # cesse d'ouvrir. Au-delà du seuil, on se taît jusqu'à ce qu'elle
+            # redescende — rien n'est perdu, la question sera reposée.
+            en_attente = len(historique.get("en_attente", []))
+            if en_attente >= _FILE_PLEINE:
+                logger.info(
+                    "ProactiveEngine: file deja pleine, aucune generation",
+                    en_attente=en_attente,
+                    seuil=_FILE_PLEINE,
+                )
+                return []
+
+            initiatives = await self._generator.generate(state, historique)
 
             if not initiatives:
                 logger.info("ProactiveEngine: no initiatives generated")
@@ -245,6 +271,22 @@ class ProactiveEngine:
         """Donne au moteur un moyen d'atteindre l'utilisateur de lui-meme."""
         self._push = push
         logger.info("Moteur proactif : push sortant branche", disponible=push.disponible())
+
+    def _historique(self) -> dict[str, list]:
+        """Ce que le magasin sait du passe recent, ou rien.
+
+        Tolerant a un magasin plus ancien : `resume_pour_generateur` peut ne pas
+        exister. Le cycle proactif ne doit pas tomber pour un enrichissement de
+        prompt -- il perdrait alors la seule fonction qui marchait deja.
+        """
+        lecteur = getattr(self._store, "resume_pour_generateur", None)
+        if not callable(lecteur):
+            return {}
+        try:
+            return dict(lecteur())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Historique des initiatives illisible", erreur=str(exc))
+            return {}
 
     async def _pousser(self, initiative: Initiative, texte: str) -> None:
         """Pousse vers les canaux quand ca merite d'interrompre, pas a chaque cycle.

@@ -575,6 +575,7 @@ def build(
         notifications=notifications,
         sauvegarde=sauvegarde_memoire,
         boite=boite_memoire,
+        initiatives=initiative_store,
     )
 
     # ── 16. Câblage des événements (Phase D — kernel.events.bus) ───────────

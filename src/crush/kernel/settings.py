@@ -529,6 +529,18 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Initiatives ───────────────────────────────────────────
+    # Mesure sur sept jours : 25 en attente, 44 rejetees sur 76 proposees. Une
+    # file qui ne fait que croitre est une file qu'on cesse d'ouvrir.
+    initiatives_expirent_apres_jours: int = Field(
+        default=5,
+        description=(
+            "Une initiative jamais tranchee passe en `expired` apres ce nombre de "
+            "jours. 0 desactive. Sans cela elle sortait silencieusement de la "
+            "fenetre de lecture en restant `pending` pour toujours."
+        ),
+    )
+
     # ── Heures de silence ─────────────────────────────────────
     # Le push fonctionne, et c'est justement le probleme : une suggestion sans
     # urgence n'a pas a sonner a trois heures du matin. Ce qui se remarque, on

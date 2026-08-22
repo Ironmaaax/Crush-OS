@@ -165,12 +165,17 @@ def _initiatives(request: Request) -> dict[str, Any]:
                 "id": getattr(i, "id", ""),
                 "titre": getattr(i, "title", ""),
                 "priorite": _priorite(i),
+                # Le POURQUOI, en une ligne. Trancher sans lui obligeait a
+                # ouvrir le Command Center pour chaque item -- et c'est
+                # precisement cette corvee qui a laisse la file monter a 25.
+                "pourquoi": str(getattr(i, "reasoning", "") or getattr(i, "context", ""))[:160],
+                "type": str(getattr(getattr(i, "type", ""), "value", getattr(i, "type", ""))),
                 "decision": str(
                     getattr(getattr(i, "execution_mode", ""), "value", "")
                 ).lower()
                 == "validate",
             }
-            for i in en_attente[:4]
+            for i in en_attente[:12]
         ],
     }
 

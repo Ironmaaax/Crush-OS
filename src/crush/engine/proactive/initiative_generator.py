@@ -123,11 +123,39 @@ def _apply_caps(items: list) -> list:
 # __NAME__ est substitué par le prénom configuré. Les accolades JSON sont littérales
 # (pas de .format) — on utilise .replace pour éviter tout conflit.
 _INITIATIVE_BODY = """
-Génère 5 initiatives MAX (2 HIGH max).
+Génère au PLUS 5 initiatives, dont au plus 2 en priorité HIGH.
 Chaque champ est limité en longueur — RESPECTE ces limites absolues.
 
 TYPES : draft_response | reminder | suggestion | alert | auto_task | info
 MODES : auto | notify | validate
+
+## LA RÈGLE LA PLUS IMPORTANTE : RIEN QUI N'ATTENDE QUELQUE CHOSE DE LUI
+
+Une initiative appelle une DÉCISION ou une ACTION de sa part. Une nouvelle
+intéressante n'en est pas une.
+
+N'écris PAS : une promotion sur un ordinateur, une hausse de tarif chez un
+opérateur, une sortie de produit, un article de veille, un comparatif, une brève
+technologique. Ce sont des informations : leur place est dans le briefing, pas
+dans une file de décisions. Chacune de ces lignes coûte une lecture et un rejet,
+et à force de rejeter on cesse de lire.
+
+Avant d'écrire une initiative, demande-toi : « que doit-il FAIRE ? ». Si la
+réponse est « en prendre connaissance », n'écris rien.
+
+MIEUX VAUT ZÉRO INITIATIVE QUE CINQ SANS OBJET. Une liste vide est une réponse
+valable et fréquente : la plupart des heures d'une journée ne demandent rien.
+
+## NE REDIS PAS CE QUI ATTEND DÉJÀ
+
+Tu tournes toutes les trois heures sur un monde qui bouge peu. Sans regarder ce
+qui attend déjà, tu réannonces la même pluie et le même projet à chaque passage.
+La section « DÉJÀ EN ATTENTE » liste ce qui est posé : n'y reviens pas, sauf si
+la situation a CHANGÉ de façon à appeler une autre décision.
+
+La section « DÉJÀ REJETÉ » liste ce qu'il a écarté. Ce sont des exemples de ce
+qu'il ne veut PAS voir : n'en propose plus de semblables, ni sur le fond, ni sur
+la forme.
 
 ## EXEMPLES DE CROISEMENTS INTELLIGENTS
 
@@ -205,6 +233,27 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans explication :
 }
 """
 
+def _bloc_historique(historique: dict[str, list] | None) -> str:
+    """Rend l'historique en listes courtes, ou rien du tout.
+
+    Des TITRES, pas des objets complets : ce texte part dans CHAQUE appel du
+    cycle proactif — huit par jour — et le contexte se paie. Un titre suffit à
+    reconnaître « on m'a déjà dit non à ce genre-là ».
+    """
+    if not historique:
+        return ""
+    morceaux: list[str] = []
+    for cle, entete in (
+        ("en_attente", "## DÉJÀ EN ATTENTE — ne les redis pas"),
+        ("rejetes", "## DÉJÀ REJETÉ — n'en propose plus de semblables"),
+        ("approuves", "## ACCEPTÉ — ce genre-là est utile"),
+    ):
+        titres = [str(t).strip() for t in (historique.get(cle) or []) if str(t).strip()]
+        if titres:
+            morceaux.append(entete + "\n" + "\n".join(f"- {t}" for t in titres))
+    return "\n\n".join(morceaux) + "\n\n" if morceaux else ""
+
+
 def _initiative_system(name: str, profile: str = "") -> str:
     """Prompt système du moteur d'initiatives, personnalisé au prénom + bio."""
     header = f"\nTu es le moteur d'analyse proactif de Crush, assistant personnel de {name}."
@@ -247,8 +296,21 @@ class InitiativeGenerator:
         self._draft_system = _draft_system(user_firstname)
         self._rectify_system = _rectify_system(user_firstname)
 
-    async def generate(self, state: WorldState) -> list[Initiative]:
-        """Génère des initiatives à partir de l'état du monde."""
+    async def generate(
+        self, state: WorldState, historique: dict[str, list] | None = None
+    ) -> list[Initiative]:
+        """Génère des initiatives à partir de l'état du monde ET de son passé.
+
+        `historique` comble le trou qui expliquait presque tous les défauts
+        observés : le générateur repartait de l'état du monde SEUL, toutes les
+        trois heures, sans savoir ce qu'il avait déjà proposé ni ce qui avait été
+        rejeté. Il redécouvrait donc les mêmes choses — deux alertes pour la même
+        pluie, trois initiatives pour le même projet — et reproposait
+        indéfiniment des genres systématiquement écartés : 44 rejets sur 76
+        propositions en sept jours.
+
+        Optionnel : sans lui, le comportement d'avant est intact.
+        """
         logger.info("InitiativeGenerator: analyzing world state")
 
         world_context = state.to_prompt_context()
@@ -259,7 +321,10 @@ class InitiativeGenerator:
         prompt = (
             f"État du monde de {self._name} :\n\n"
             f"{world_context}\n\n"
-            "Génère les 5 initiatives les plus pertinentes et urgentes (3 HIGH max)."
+            f"{_bloc_historique(historique)}"
+            "Propose ce qui demande une décision ou une action de sa part, et RIEN "
+            "d'autre. Au plus 5, au plus 2 en HIGH. Une liste vide est une réponse "
+            "valable si rien ne l'appelle."
         )
 
         response = await self._llm.complete(

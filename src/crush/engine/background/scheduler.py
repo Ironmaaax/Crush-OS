@@ -67,6 +67,7 @@ class Scheduler:
         notifications: NotificationQueue | None = None,
         sauvegarde: MemoryBackup | None = None,
         boite: BoiteMemoire | None = None,
+        initiatives: object | None = None,
     ) -> None:
         self._proactive = proactive
         self._auto_dream = auto_dream
@@ -79,6 +80,8 @@ class Scheduler:
         self._sauvegarde = sauvegarde
         # Consignes écrites à la main dans Obsidian. Même règle d'injection.
         self._boite = boite
+        # Magasin des initiatives, pour la passe d'expiration nocturne.
+        self._initiatives = initiatives
         # File des notifications, glissées en fin de réponse par le Gateway.
         # `_proactive.broadcast` ne touche que les clients CONNECTÉS à l'instant :
         # sur une machine allumée en permanence et consultée par intermittence,
@@ -437,6 +440,25 @@ class Scheduler:
             delay = _seconds_until(3) + 600
             logger.debug("Curator scan planifié", seconds=int(delay))
             await asyncio.sleep(delay)
+            # L'EXPIRATION est faite ICI et non dans le Curator : celui-ci a pour
+            # regle non negociable de PROPOSER sans jamais APPLIQUER (CDC §10).
+            # Y glisser une ecriture aurait casse l'invariant qu'il annonce en
+            # tete de son propre module. Le planificateur, lui, est un acteur.
+            #
+            # Sans cette passe, une initiative jamais tranchee sortait de la
+            # fenetre de sept jours au huitieme jour, en restant `pending` dans un
+            # fichier que plus personne ne lit : on ne pouvait donc pas savoir
+            # combien de questions etaient restees sans reponse.
+            if self._initiatives is not None and self._settings.initiatives_expirent_apres_jours:
+                try:
+                    expirees = self._initiatives.expirer(
+                        self._settings.initiatives_expirent_apres_jours
+                    )
+                    if expirees:
+                        logger.info("Initiatives expirees", nombre=expirees)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Expiration des initiatives echouee", error=str(exc))
+
             try:
                 logger.info("Curator scan nocturne démarré")
                 report = await self._curator.scan()

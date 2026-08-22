@@ -129,6 +129,63 @@
     return bloc;
   }
 
+  /* Trancher LA OU on lit, sans changer d'ecran.
+   *
+   * C'est le geste qui manquait, et c'est ce qui explique la file : decider
+   * demandait d'ouvrir le Command Center pour chaque item, donc on remettait, et
+   * 25 initiatives se sont accumulees. Deux boutons sur la ligne, et le tri
+   * devient une affaire de secondes.
+   *
+   * Les deux appels passent par les routes existantes, donc par
+   * `interfaces/decision.traiter` : le meme chemin que le bouton Telegram et que
+   * le Command Center. Trois portes, une seule execution.
+   */
+  function ligneInitiative(i) {
+    const l = el("div", { class: "a-ligne a-init" });
+
+    const corps = el("div", { class: "a-ligne-corps" });
+    const titre = el("div", { class: "a-ligne-t", text: i.titre });
+    corps.appendChild(titre);
+    if (i.pourquoi) corps.appendChild(el("div", { class: "a-remede", text: i.pourquoi }));
+    l.appendChild(corps);
+
+    const marque = el("span", { class: "a-marque" });
+    marque.dataset.chaud = String(i.priorite === "high");
+    marque.textContent = i.decision ? "décision" : i.priorite;
+    l.appendChild(marque);
+
+    const actions = el("div", { class: "a-actions" });
+    actions.appendChild(bouton("✓", "Approuver", "/approve", "a-oui"));
+    actions.appendChild(bouton("✕", "Écarter", "/reject", "a-non"));
+    l.appendChild(actions);
+
+    function bouton(signe, titreBulle, chemin, classe) {
+      const b = el("button", { class: "a-act " + classe, text: signe });
+      b.title = titreBulle;
+      b.addEventListener("click", async function () {
+        actions.querySelectorAll("button").forEach(function (x) { x.disabled = true; });
+        try {
+          const r = await J.api.post("/api/initiatives/" + i.id + chemin, null);
+          /* On retire la ligne au lieu de tout recharger : rafraichir la page
+           * entiere ferait sauter les autres lignes sous le doigt, et on
+           * trancherait la mauvaise. */
+          l.dataset.parti = "true";
+          setTimeout(function () { l.remove(); }, 260);
+          J.notify({
+            kind: "success",
+            text: (chemin === "/approve" ? "Approuvé" : "Écarté") + " · "
+              + (r.detail || i.titre),
+          });
+        } catch (e) {
+          J.notify({ kind: "error", text: e.message });
+          actions.querySelectorAll("button").forEach(function (x) { x.disabled = false; });
+        }
+      });
+      return b;
+    }
+    return l;
+  }
+
   /* ── Rendu ────────────────────────────────────────────────────────────────── */
 
   async function render(hote) {
@@ -213,14 +270,7 @@
     const init = el("div", { class: "a-liste" });
     if (d.initiatives.en_attente) {
       d.initiatives.liste.forEach(function (i) {
-        const l = el("a", { class: "a-ligne", href: "/command" });
-        l.appendChild(el("span", { class: "a-fleche", text: "▸" }));
-        l.appendChild(el("span", { class: "a-ligne-t", text: i.titre }));
-        const marque = el("span", { class: "a-marque" });
-        marque.dataset.chaud = String(i.priorite === "high");
-        marque.textContent = i.decision ? "décision" : i.priorite;
-        l.appendChild(marque);
-        init.appendChild(l);
+        init.appendChild(ligneInitiative(i));
       });
       if (d.initiatives.en_attente > d.initiatives.liste.length) {
         init.appendChild(el("div", {

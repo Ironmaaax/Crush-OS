@@ -332,3 +332,91 @@ def test_une_cle_inconnue_ne_devient_pas_zero() -> None:
 
     assert cout["mois"] is None
     assert cout["serie"] == []
+
+
+# ── 6. Le tri sur place ───────────────────────────────────────────────────────
+
+
+class _MagasinInitiatives:
+    """Doublure du magasin, avec de quoi remplir une file."""
+
+    def __init__(self, combien: int) -> None:
+        self._combien = combien
+
+    def load_pending_all(self, days: int = 7) -> list:
+        return [
+            SimpleNamespace(
+                id=f"init_{i}",
+                title=f"Initiative {i}",
+                reasoning=f"Parce que {i}",
+                context="",
+                priority=SimpleNamespace(value="high" if i == 0 else "low"),
+                type=SimpleNamespace(value="suggestion"),
+                execution_mode=SimpleNamespace(value="validate" if i == 0 else "notify"),
+            )
+            for i in range(self._combien)
+        ]
+
+
+def _avec_initiatives(combien: int) -> TestClient:
+    app = FastAPI()
+    app.include_router(router)
+    app.state.initiative_store = _MagasinInitiatives(combien)
+    return TestClient(app)
+
+
+def test_la_liste_va_jusqu_a_douze() -> None:
+    """La file est plafonnée à douze : les montrer toutes rend le tri possible
+    d'un seul écran, ce qui était la vraie cause du bouchon — décider imposait
+    d'ouvrir le Command Center pour CHAQUE item."""
+    with _avec_initiatives(30) as c:
+        init = c.get("/api/apercu").json()["initiatives"]
+
+    assert init["en_attente"] == 30
+    assert len(init["liste"]) == 12
+
+
+def test_chaque_initiative_porte_son_identifiant_et_sa_raison() -> None:
+    """L'identifiant sert aux deux boutons ; la raison évite d'aller la chercher
+    ailleurs pour pouvoir trancher."""
+    with _avec_initiatives(3) as c:
+        liste = c.get("/api/apercu").json()["initiatives"]["liste"]
+
+    for i in liste:
+        assert i["id"].startswith("init_")
+        assert i["pourquoi"]
+        assert i["type"] == "suggestion"
+
+
+def test_une_decision_attendue_est_distinguee_d_une_notification() -> None:
+    with _avec_initiatives(2) as c:
+        liste = c.get("/api/apercu").json()["initiatives"]["liste"]
+
+    assert liste[0]["decision"] is True
+    assert liste[1]["decision"] is False
+
+
+def test_la_raison_est_bornee() -> None:
+    """Ce champ nourrit une ligne de liste, pas un article."""
+    app = FastAPI()
+    app.include_router(router)
+
+    class _Long:
+        def load_pending_all(self, days: int = 7) -> list:
+            return [
+                SimpleNamespace(
+                    id="init_l",
+                    title="T",
+                    reasoning="x" * 900,
+                    context="",
+                    priority=SimpleNamespace(value="low"),
+                    type=SimpleNamespace(value="info"),
+                    execution_mode=SimpleNamespace(value="notify"),
+                )
+            ]
+
+    app.state.initiative_store = _Long()
+    with TestClient(app) as c:
+        liste = c.get("/api/apercu").json()["initiatives"]["liste"]
+
+    assert len(liste[0]["pourquoi"]) <= 160
