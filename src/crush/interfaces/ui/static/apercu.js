@@ -43,10 +43,58 @@
     return "dans " + Math.round(delta / 86400) + " j";
   }
 
+  /* Une aire remplie, pas le filet de `Crush.sparkline` : sur une tuile sombre,
+   * une ligne d'un pixel disparait, et une depense se lit a son VOLUME plus
+   * qu'a sa pente. Sept valeurs, donc pas de lissage : chaque jour reste un
+   * sommet identifiable. */
+  function courbe(serie, teinte) {
+    const l = 214, h = 40, ns = "http://www.w3.org/2000/svg";
+    const max = Math.max.apply(null, serie) || 1;
+    const pts = serie.map(function (v, i) {
+      return [(i / (serie.length - 1)) * l, h - (v / max) * (h - 6) - 3];
+    });
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + l + " " + h);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", String(h));
+    svg.setAttribute("preserveAspectRatio", "none");
+
+    const trace = pts.map(function (p, i) {
+      return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1);
+    }).join(" ");
+
+    const aire = document.createElementNS(ns, "path");
+    aire.setAttribute("d", trace + " L" + l + " " + h + " L0 " + h + " Z");
+    aire.setAttribute("fill", teinte);
+    aire.setAttribute("fill-opacity", ".13");
+    svg.appendChild(aire);
+
+    const ligne = document.createElementNS(ns, "path");
+    ligne.setAttribute("d", trace);
+    ligne.setAttribute("fill", "none");
+    ligne.setAttribute("stroke", teinte);
+    ligne.setAttribute("stroke-width", "1.6");
+    ligne.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(ligne);
+
+    // Le dernier point marque : c'est celui qu'on cherche, aujourd'hui.
+    const dernier = pts[pts.length - 1];
+    const point = document.createElementNS(ns, "circle");
+    point.setAttribute("cx", dernier[0].toFixed(1));
+    point.setAttribute("cy", dernier[1].toFixed(1));
+    point.setAttribute("r", "2.6");
+    point.setAttribute("fill", teinte);
+    svg.appendChild(point);
+    return svg;
+  }
+
   /* ── Briques ──────────────────────────────────────────────────────────────── */
 
-  function tuile(etiquette, valeur, lignes, accent) {
+  function tuile(etiquette, valeur, lignes, accent, teinte) {
     const t = el("div", { class: "a-tuile" });
+    /* Les memes couleurs que les types du graphe : les deux vues doivent
+     * parler la meme langue, sinon chacune a son code et on les relit. */
+    if (teinte) t.style.setProperty("--a-teinte", teinte);
     t.appendChild(el("div", { class: "a-tuile-lbl", text: etiquette }));
     const v = el("div", { class: "a-tuile-val", text: valeur });
     if (accent) v.style.color = accent;
@@ -121,6 +169,8 @@
       d.cerveau.backend,
       [d.cerveau.modele, d.cerveau.reflexion ? "réflexion active" : "réflexion inactive",
        "voix · " + d.cerveau.voix],
+      null,
+      "#a06ee0",
     ));
 
     const memLignes = [
@@ -135,18 +185,25 @@
       d.memoire.faits == null ? "—" : d.memoire.faits + " faits",
       memLignes,
       d.memoire.sauvegarde_inquiete ? "#d99a3c" : null,
+      d.memoire.sauvegarde_inquiete ? "#d99a3c" : "#4a90e2",
     ));
 
     const coutTuile = tuile(
       "Coût",
       argent(d.cout.aujourd_hui, d.cout.devise),
       ["aujourd'hui", d.cout.mois != null ? argent(d.cout.mois, d.cout.devise) + " ce mois" : ""],
+      null,
+      "#d4af6a",
     );
     if (d.cout.serie && d.cout.serie.length > 1) {
-      const sp = J.sparkline(d.cout.serie, { width: 132, height: 24, color: "#d4af6a" });
       const enveloppe = el("div", { class: "a-spark" });
-      enveloppe.appendChild(sp);
-      enveloppe.appendChild(el("div", { class: "a-tuile-sub", text: "7 derniers jours" }));
+      enveloppe.appendChild(courbe(d.cout.serie, "#d4af6a"));
+      const bornes = el("div", { class: "a-spark-lbl" });
+      bornes.appendChild(el("span", { text: "7 derniers jours" }));
+      bornes.appendChild(el("span", {
+        text: "max " + argent(Math.max.apply(null, d.cout.serie), d.cout.devise),
+      }));
+      enveloppe.appendChild(bornes);
       coutTuile.appendChild(enveloppe);
     }
     tuiles.appendChild(coutTuile);
@@ -179,7 +236,14 @@
           : "rien qui demande ton attention",
       }));
     }
-    page.appendChild(section(
+    const colonnes = el("div", { class: "a-colonnes" });
+    const colG = el("div", { class: "a-col" });
+    const colD = el("div", { class: "a-col" });
+    colonnes.appendChild(colG);
+    colonnes.appendChild(colD);
+    page.appendChild(colonnes);
+
+    colG.appendChild(section(
       "À traiter",
       d.initiatives.en_attente
         ? d.initiatives.en_attente + (d.initiatives.haute ? " · " + d.initiatives.haute + " urgente(s)" : "")
@@ -203,7 +267,7 @@
     if (!(eco.a_regarder || []).length) {
       aRegarder.appendChild(el("div", { class: "a-vide", text: "tous les maillons tiennent" }));
     }
-    page.appendChild(section(
+    colG.appendChild(section(
       "À regarder",
       eco.ok != null ? eco.ok + " ok · " + (eco.degrade || 0) + " dégradé · " + (eco.absent || 0) + " absent" : "",
       aRegarder,
@@ -221,7 +285,7 @@
       liens.appendChild(el("div", { class: "a-etiq", text: "dormant" }));
       liens.appendChild(pastilles(dorment));
     }
-    page.appendChild(section("Ce qui est branché", relies.length + " / " + (d.relie || []).length, liens));
+    colD.appendChild(section("Ce qui est branché", relies.length + " / " + (d.relie || []).length, liens));
 
     /* Boucles */
     const boucles = el("div", { class: "a-liste" });
@@ -241,7 +305,7 @@
           + (silence.urgent_passe ? " — les décisions urgentes passent quand même" : " — rien ne part"),
       }));
     }
-    page.appendChild(section("Ce qui tourne tout seul", (d.boucles || []).length + " boucles", boucles));
+    colD.appendChild(section("Ce qui tourne tout seul", (d.boucles || []).length + " boucles", boucles));
 
     hote.appendChild(page);
   }

@@ -45,7 +45,17 @@
   };
   /* Les arêtes déduites d'une correspondance de nom sont les seules qui relèvent
    * d'une supposition : elles sont tracées plus discrètement que les autres. */
-  const OPACITE_ARETE = { contenu: .34, predicat: .2, partie: .16, pilote: .34, memoire: .5, nom: .13 };
+  const ARETES = {
+    contenu:  { teinte: [.42, .58, .82], force: .58 },
+    predicat: { teinte: [.58, .44, .78], force: .34 },
+    partie:   { teinte: [.52, .56, .64], force: .26 },
+    pilote:   { teinte: [.24, .72, .50], force: .62 },
+    memoire:  { teinte: [.95, .72, .34], force: .85 },
+    // La seule aretededuite d'une correspondance de nom : tracee plus
+    // discretement que les autres, parce qu'elle releve d'une supposition.
+    nom:      { teinte: [.70, .60, .40], force: .20 },
+  };
+  const ARETE_DEFAUT = { teinte: [.45, .52, .64], force: .3 };
 
   const _SEUIL_LOURD = 800;
 
@@ -56,7 +66,7 @@
   let recherche = "";
   let plat = false;
 
-  let scene, camera, rendu, spheres = [], aretes = null, geoAretes = null;
+  let scene, camera, rendu, spheres = [], halos = [], aretes = null, geoAretes = null;
   let alpha = 1, animation = null;
   const conteneur = document.getElementById("graphe-scene");
   const calqueLabels = document.getElementById("graphe-labels");
@@ -86,7 +96,7 @@
       }
     }
     rendu = null; scene = null; camera = null;
-    spheres = []; aretes = null; geoAretes = null;
+    spheres = []; halos = []; aretes = null; geoAretes = null;
     labels = [];
     calqueLabels.innerHTML = "";
     document.getElementById("graphe-ui").innerHTML = "";
@@ -173,7 +183,12 @@
     const n = actifs.length;
     if (!n) return;
 
-    const REPULSION = 2400, RESSORT = 0.012, LONGUEUR = 46, CENTRE = 0.0016, FROTTEMENT = 0.82;
+    /* Ressort plus court et plus raide, repulsion plus forte : la premiere
+     * version produisait de longs filaments et des noeuds perdus au loin, parce
+     * qu'un ressort mou sur une longue distance ne ramene rien. Le rappel vers
+     * le centre est aussi renforce, sinon les branches derivent hors du champ. */
+    const REPULSION = 3600, RESSORT = 0.026, LONGUEUR = 34, CENTRE = 0.0032, FROTTEMENT = 0.80;
+    const VITESSE_MAX = 9;
 
     for (let i = 0; i < n; i++) {
       const a = actifs[i];
@@ -206,6 +221,11 @@
     actifs.forEach(function (p) {
       p.vx -= p.x * CENTRE; p.vy -= p.y * CENTRE; p.vz -= p.z * CENTRE;
       p.vx *= FROTTEMENT; p.vy *= FROTTEMENT; p.vz *= FROTTEMENT;
+      const v = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz);
+      if (v > VITESSE_MAX) {
+        const k = VITESSE_MAX / v;
+        p.vx *= k; p.vy *= k; p.vz *= k;
+      }
       p.x += p.vx * alpha; p.y += p.vy * alpha;
       p.z = plat ? p.z * 0.86 : p.z + p.vz * alpha;
     });
@@ -231,10 +251,19 @@
 
     /* Une seule géométrie pour toutes les sphères ; le rayon vient de l'échelle,
      * ce qui évite autant de géométries que de tailles. */
-    const geo = new THREE.SphereGeometry(1, 18, 14);
+    const geo = new THREE.SphereGeometry(1, 20, 16);
+    // Une seconde geometrie, plus grossiere, pour les halos : ils sont flous par
+    // nature, 12 segments suffisent, et c'est deux fois moins de triangles a
+    // dessiner sur des centaines de noeuds.
+    const geoHalo = new THREE.SphereGeometry(1, 12, 9);
     noeuds.forEach(function (nd) {
+      const couleur = COULEURS[nd.type] || 0x8a919c;
       const mat = new THREE.MeshLambertMaterial({
-        color: COULEURS[nd.type] || 0x8a919c,
+        color: couleur,
+        emissive: couleur,
+        // Un peu d'emissif : sans lui, la face non eclairee d'une sphere est
+        // noire, et la moitie du nuage disparait selon l'angle de la camera.
+        emissiveIntensity: .35,
         transparent: true,
         opacity: 1,
       });
@@ -243,6 +272,17 @@
       m.userData.id = nd.id;
       scene.add(m);
       spheres.push(m);
+
+      const halo = new THREE.Mesh(geoHalo, new THREE.MeshBasicMaterial({
+        color: couleur,
+        transparent: true,
+        opacity: .1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,  // sinon le halo masque les noeuds derriere lui
+      }));
+      halo.scale.setScalar(rayon(nd) * 2.7);
+      scene.add(halo);
+      halos.push(halo);
     });
 
     geoAretes = new THREE.BufferGeometry();
@@ -263,11 +303,13 @@
   }
 
   function rayon(nd) {
-    if (nd.type === "racine") return 7;
+    if (nd.type === "racine") return 9;
     /* La racine à part, la taille suit le nombre de liens — le moyeu se voit
      * sans avoir à lire le panneau. Racine cubique pour que le plus relié ne
-     * devienne pas une planète. */
-    return 2.1 + Math.cbrt(nd.degre || 1) * 1.5;
+     * devienne pas une planète, mais avec assez d'ecart pour que la difference
+     * entre un fait isole et un document se voie : la premiere version rendait
+     * 3,2 contre 6,5, ce qui se lisait comme des billes toutes pareilles. */
+    return 2.6 + Math.cbrt(nd.degre || 1) * 2.3;
   }
 
   /* ── Contrôles ──────────────────────────────────────────────────────────── */
@@ -385,19 +427,29 @@
   }
 
   function dessiner() {
-    const avant = ensembleEnAvant();
+    const ensemble = ensembleEnAvant();
     const motif = recherche.trim().toLowerCase();
 
     noeuds.forEach(function (nd, i) {
-      const m = spheres[i];
+      const m = spheres[i], h = halos[i];
       m.visible = nd.visible;
+      if (h) h.visible = nd.visible;
       if (!nd.visible) return;
       m.position.set(nd.x, nd.y, nd.z);
       let op = 1;
-      if (avant) op = avant.has(nd.id) ? 1 : 0.07;
+      if (ensemble) op = ensemble.has(nd.id) ? 1 : 0.07;
       if (motif) op = nd.label.toLowerCase().indexOf(motif) >= 0 ? 1 : Math.min(op, 0.08);
       m.material.opacity = op;
-      m.scale.setScalar(rayon(nd) * (nd.id === selection ? 1.5 : 1));
+      const grossi = nd.id === selection ? 1.5 : (nd.id === survole ? 1.2 : 1);
+      m.scale.setScalar(rayon(nd) * grossi);
+      if (h) {
+        h.position.set(nd.x, nd.y, nd.z);
+        // Le halo s'eteint plus vite que la sphere : au-dela d'une poignee de
+        // noeuds eclaires, la somme des halos delaves fait un brouillard qui
+        // masque ce qu'on cherchait a isoler.
+        h.material.opacity = .1 * op * op;
+        h.scale.setScalar(rayon(nd) * 2.7 * grossi);
+      }
     });
 
     const pos = geoAretes.attributes.position.array;
@@ -413,11 +465,12 @@
       pos[k] = a.x; pos[k + 1] = a.y; pos[k + 2] = a.z;
       pos[k + 3] = b.x; pos[k + 4] = b.y; pos[k + 5] = b.z;
 
-      let force = OPACITE_ARETE[l.origine] || .25;
-      if (avant) force = (avant.has(l.de) && avant.has(l.vers)) ? .95 : .022;
+      const style = ARETES[l.origine] || ARETE_DEFAUT;
+      let force = style.force;
+      if (ensemble) force = (ensemble.has(l.de) && ensemble.has(l.vers)) ? 1 : .02;
       const teinte = chemin.size && chemin.has(l.de) && chemin.has(l.vers)
-        ? [1, .78, .35]
-        : [.42, .55, .72];
+        ? [1, .80, .38]
+        : style.teinte;
       for (let s = 0; s < 2; s++) {
         col[k + s * 3] = teinte[0] * force;
         col[k + s * 3 + 1] = teinte[1] * force;
@@ -427,38 +480,67 @@
     geoAretes.attributes.position.needsUpdate = true;
     geoAretes.attributes.color.needsUpdate = true;
 
-    majLabels(avant);
+    majLabels(ensemble);
     rendu.render(scene, camera);
   }
 
   /* On n'écrit que les nœuds qui méritent d'être lus : tout étiqueter donne une
    * bouillie illisible dès la centaine de nœuds. */
-  function majLabels(avant) {
+  function majLabels(ensemble) {
     const aEcrire = noeuds.filter(function (nd) {
       if (!nd.visible) return false;
       if (nd.id === selection || (chemin.size && chemin.has(nd.id))) return true;
       if (nd.id === survole) return true;
-      if (avant) return false;
-      return nd.type === "racine" || nd.type === "document" || nd.degre >= 4;
+      if (ensemble) return false;
+      return nd.type === "racine" || nd.type === "document" || nd.degre >= 3;
     });
+    // Du plus relie au moins : quand deux libelles se disputent la meme place,
+    // c'est le moyeu qui gagne. Sans cet ordre, l'un des deux l'emportait selon
+    // l'ordre d'arrivee des donnees.
+    aEcrire.sort(function (a, b) { return (b.degre || 0) - (a.degre || 0); });
 
     while (labels.length < aEcrire.length) {
       const d = el("div", { class: "g-label" });
       calqueLabels.appendChild(d);
       labels.push(d);
     }
-    labels.forEach(function (d, i) {
-      const nd = aEcrire[i];
-      if (!nd) { d.style.display = "none"; return; }
+    /* Anti-chevauchement. Dans la premiere version « Tools » et « uses » se
+     * superposaient exactement, et les deux devenaient illisibles : deux textes
+     * empiles ne donnent pas un texte a moitie lisible, ils donnent une tache.
+     *
+     * Rectangles approches plutot que mesures : `getBoundingClientRect()` sur
+     * chaque libelle a chaque image forcerait un recalcul de mise en page par
+     * image, ce qui coute bien plus que la geometrie qu'on evite. Une largeur
+     * estimee a 6,4 px par caractere suffit a decider qui cede la place. */
+    const places = [];
+    let ecrits = 0;
+    aEcrire.forEach(function (nd) {
+      if (ecrits >= labels.length) return;
       const v = new THREE.Vector3(nd.x, nd.y, nd.z).project(camera);
-      if (v.z > 1) { d.style.display = "none"; return; }
+      if (v.z > 1) return;
+      const texte = nd.label.length > 34 ? nd.label.slice(0, 33) + "…" : nd.label;
+      const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-v.y * 0.5 + 0.5) * window.innerHeight - rayon(nd) - 10;
+      const demiL = Math.max(18, texte.length * 3.2), demiH = 9;
+
+      // La selection et le chemin passent toujours : ce sont eux qu'on regarde.
+      const prioritaire = nd.id === selection || nd.id === survole
+        || (chemin.size && chemin.has(nd.id));
+      if (!prioritaire) {
+        const gene = places.some(function (r) {
+          return Math.abs(r.x - x) < r.demiL + demiL && Math.abs(r.y - y) < r.demiH + demiH;
+        });
+        if (gene) return;
+      }
+      places.push({ x: x, y: y, demiL: demiL, demiH: demiH });
+
+      const d = labels[ecrits++];
       d.style.display = "";
-      d.textContent = nd.label.length > 34 ? nd.label.slice(0, 33) + "…" : nd.label;
+      d.textContent = texte;
       d.dataset.fort = (nd.id === selection || nd.type === "racine") ? "true" : "false";
-      d.style.transform = "translate(-50%,-50%) translate("
-        + ((v.x * 0.5 + 0.5) * window.innerWidth) + "px,"
-        + ((-v.y * 0.5 + 0.5) * window.innerHeight - rayon(nd) - 9) + "px)";
+      d.style.transform = "translate(-50%,-50%) translate(" + x + "px," + y + "px)";
     });
+    for (let i = ecrits; i < labels.length; i++) labels[i].style.display = "none";
   }
 
   function boucle() {
