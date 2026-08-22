@@ -310,8 +310,8 @@ def test_le_plus_important_survit_au_plafond(kernel: MemoryKernel) -> None:
     assert "monsieur" in bloc
 
 
-def test_un_fait_incertain_est_marque_comme_tel(kernel: MemoryKernel) -> None:
-    """Un fait à 55 % ne doit pas être affirmé sur le même ton qu'un fait à 95 % —
+def test_un_fait_deduit_est_marque_comme_tel(kernel: MemoryKernel) -> None:
+    """Un fait déduit ne doit pas être affirmé sur le même ton qu'un fait énoncé —
     sans marque, le modèle les traite à égalité."""
     kernel.insert_fact(_fait("sur", obj="café", confidence=0.95))
     kernel.insert_fact(_fait("moyen", obj="thé", confidence=0.55))
@@ -319,8 +319,27 @@ def test_un_fait_incertain_est_marque_comme_tel(kernel: MemoryKernel) -> None:
     bloc = bloc_memoire(kernel)
 
     lignes = {ligne.split(" ", 2)[-1].split(" _(")[0]: ligne for ligne in bloc.splitlines()}
-    assert "à confirmer" not in lignes.get("café", "")
-    assert "à confirmer" in lignes.get("thé", "")
+    assert "déduit" not in lignes.get("café", "")
+    assert "déduit" in lignes.get("thé", "")
+
+
+def test_un_enonce_explicite_nest_pas_mis_en_doute(kernel: MemoryKernel) -> None:
+    """LE calibrage, et il n'était pas couvert.
+
+    0,75 signifie « énoncé explicite » dans l'échelle du projet (§6.5) : Max l'a
+    dit. Le seuil d'affichage était à 0,80, donc au-dessus — mesuré sur la base
+    réelle, 18 des 22 lignes du bloc portaient une réserve, dont des faits qu'il
+    avait énoncés lui-même. Un mur de réserves n'enseigne pas la prudence, il
+    apprend à tout relativiser.
+    """
+    kernel.insert_fact(_fait("enonce", obj="thé vert", confidence=0.75))
+    kernel.insert_fact(_fait("deduit", obj="thé noir", confidence=0.55))
+
+    bloc = bloc_memoire(kernel)
+
+    lignes = {ligne.split(" ", 2)[-1].split(" _(")[0]: ligne for ligne in bloc.splitlines()}
+    assert "déduit" not in lignes.get("thé vert", ""), "un énoncé explicite est mis en doute"
+    assert "déduit" in lignes.get("thé noir", "")
 
 
 def test_seuls_les_faits_actifs_entrent(kernel: MemoryKernel) -> None:

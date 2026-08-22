@@ -301,6 +301,7 @@ def build(
         sessions_dir=memory_dir / "sessions",
         memory_ingest=_deep_ingest,
         mirror=memory_mirror,
+        kernel=memory_kernel,
         user_firstname=settings.display_name,
         assistant_name=settings.display_assistant_name,
     )

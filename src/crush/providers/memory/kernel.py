@@ -21,6 +21,7 @@ Invariants :
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import uuid
 from collections.abc import Iterator
@@ -156,6 +157,15 @@ _MOTS_VIDES_FTS = frozenset(
 )
 
 
+# Plafond de termes envoyés à FTS5. Une question de plus de douze mots porteurs
+# n'est plus une recherche, c'est un paragraphe.
+_MAX_TERMES = 12
+# Un mot d'au moins six lettres reçoit aussi une racine tronquée à cinq, pour
+# attraper les flexions : `projets` doit trouver « projet ».
+_LONGUEUR_MIN_RACINE = 6
+_LONGUEUR_RACINE = 5
+
+
 def _termes_fts(query: str) -> list[str]:
     """Les termes porteurs d'une requête, prêts pour un MATCH FTS5.
 
@@ -163,10 +173,8 @@ def _termes_fts(query: str) -> list[str]:
     être confondu avec un opérateur FTS5 (`"`, `*`, `(`, `:`, `NEAR`...), donc
     aucune saisie utilisateur ne peut casser la requête ni en détourner le sens.
     """
-    import re as _re
-
-    mots = _re.findall(r"[0-9a-zà-öø-ÿ]{2,}", query.lower())
-    porteurs = [m for m in mots if m not in _MOTS_VIDES_FTS][:12]
+    mots = re.findall(r"[0-9a-zà-öø-ÿ]{2,}", query.lower())
+    porteurs = [m for m in mots if m not in _MOTS_VIDES_FTS][:_MAX_TERMES]
 
     # Un préfixe FTS5 s'étend vers la DROITE : `projet*` trouve « projets », mais
     # `projets*` ne trouve PAS « projet ». Or l'utilisateur écrit au pluriel et le
@@ -180,8 +188,8 @@ def _termes_fts(query: str) -> list[str]:
     termes: list[str] = []
     for m in porteurs:
         termes.append(m)
-        if len(m) >= 6:
-            termes.append(m[:5])
+        if len(m) >= _LONGUEUR_MIN_RACINE:
+            termes.append(m[:_LONGUEUR_RACINE])
     # Dédoublonné en gardant l'ordre : « projets » et « projet » produiraient
     # deux fois « proje ».
     return list(dict.fromkeys(termes))
@@ -370,26 +378,39 @@ class MemoryKernel:
         relecture en base — d'où la survie du défaut.
         """
         with self._conn() as conn:
-            conn.execute(
-                "UPDATE facts SET object=?, status=?, confidence=?, support_count=?, "
-                "decay_policy=?, importance=?, valid_from=?, valid_to=?, "
-                "last_seen_at=?, updated_at=? WHERE id=?",
-                (
-                    fact.object,
-                    fact.status.value,
-                    fact.confidence,
-                    fact.support_count,
-                    fact.decay_policy.value,
-                    fact.importance,
-                    fact.valid_from.isoformat() if fact.valid_from else None,
-                    fact.valid_to.isoformat() if fact.valid_to else None,
-                    fact.last_seen_at.isoformat(),
-                    datetime.now().isoformat(),
-                    fact.id,
-                ),
-            )
-            self._fts_upsert(conn, fact)
+            self._update_fact_on(conn, fact)
             conn.commit()
+
+    def _update_fact_on(self, conn: sqlite3.Connection, fact: Fact) -> None:
+        """L'écriture seule, sur une connexion fournie et SANS commit.
+
+        Extrait pour que `fusionner_doublons` puisse écrire plusieurs lignes dans
+        UNE transaction. Une fusion enchaîne un survivant et N archivages ; avec
+        une connexion par ligne, chacune committait seule, et un plantage entre
+        deux laissait le survivant porteur du total du groupe pendant que des
+        doublons restaient ACTIFS. La passe suivante les re-sommait : le support
+        du survivant gonflait, définitivement, et c'est justement la clé de tri
+        qui le désigne survivant.
+        """
+        conn.execute(
+            "UPDATE facts SET object=?, status=?, confidence=?, support_count=?, "
+            "decay_policy=?, importance=?, valid_from=?, valid_to=?, "
+            "last_seen_at=?, updated_at=? WHERE id=?",
+            (
+                fact.object,
+                fact.status.value,
+                fact.confidence,
+                fact.support_count,
+                fact.decay_policy.value,
+                fact.importance,
+                fact.valid_from.isoformat() if fact.valid_from else None,
+                fact.valid_to.isoformat() if fact.valid_to else None,
+                fact.last_seen_at.isoformat(),
+                datetime.now().isoformat(),
+                fact.id,
+            ),
+        )
+        self._fts_upsert(conn, fact)
 
     def get_fact(self, fact_id: str) -> Fact | None:
         with self._conn() as conn:
@@ -426,6 +447,13 @@ class MemoryKernel:
 
         absorbes = 0
         for g in groupes:
+            # UNE transaction par groupe. Tout ou rien : soit le survivant porte
+            # le total ET les doublons sont archivés, soit le groupe est intact.
+            #
+            # Un groupe par transaction plutôt que la passe entière : un groupe
+            # illisible ou verrouillé ne doit pas annuler les fusions déjà
+            # faites, et une transaction courte ne retient pas le verrou d'écriture
+            # pendant toute la passe — le process voix écrit sur la même base.
             with self._conn() as conn:
                 rows = conn.execute(
                     "SELECT * FROM facts WHERE subject=? AND predicate=? AND object=? "
@@ -433,24 +461,34 @@ class MemoryKernel:
                     (g["subject"], g["predicate"], g["object"], g["category"],
                      FactStatus.ACTIVE.value),
                 ).fetchall()
-            faits = [self._row_to_fact(r) for r in rows]
-            if len(faits) < 2:
-                continue
+                faits = [self._row_to_fact(r) for r in rows]
+                if len(faits) < 2:
+                    continue
 
-            faits.sort(key=lambda f: (-f.support_count, -f.confidence, f.created_at))
-            survivant, doublons = faits[0], faits[1:]
+                faits.sort(key=lambda f: (-f.support_count, -f.confidence, f.created_at))
+                survivant, doublons = faits[0], faits[1:]
 
-            survivant.support_count = sum(f.support_count for f in faits)
-            survivant.confidence = max(f.confidence for f in faits)
-            survivant.importance = max(f.importance for f in faits)
-            survivant.last_seen_at = max(f.last_seen_at for f in faits)
-            self.update_fact(survivant)
+                survivant.support_count = sum(f.support_count for f in faits)
+                survivant.confidence = max(f.confidence for f in faits)
+                survivant.importance = max(f.importance for f in faits)
+                survivant.last_seen_at = max(f.last_seen_at for f in faits)
+                self._update_fact_on(conn, survivant)
 
-            for d in doublons:
-                d.status = FactStatus.SUPERSEDED
-                self.update_fact(d)
-                self.link_facts(survivant.id, d.id, RelationType.SUPERSEDES)
-                absorbes += 1
+                for d in doublons:
+                    d.status = FactStatus.SUPERSEDED
+                    self._update_fact_on(conn, d)
+                    self._link_facts_on(
+                        conn,
+                        FactRelation(
+                            id=_new_id("rel"),
+                            from_fact_id=survivant.id,
+                            to_fact_id=d.id,
+                            relation_type=RelationType.SUPERSEDES,
+                            created_at=datetime.now(),
+                        ),
+                    )
+                conn.commit()
+                absorbes += len(doublons)
 
         if absorbes:
             logger.info(
@@ -595,19 +633,24 @@ class MemoryKernel:
             created_at=datetime.now(),
         )
         with self._conn() as conn:
-            conn.execute(
-                "INSERT INTO fact_relations(id, from_fact_id, to_fact_id, "
-                "relation_type, created_at) VALUES (?, ?, ?, ?, ?)",
-                (
-                    rel.id,
-                    rel.from_fact_id,
-                    rel.to_fact_id,
-                    rel.relation_type.value,
-                    rel.created_at.isoformat(),
-                ),
-            )
+            self._link_facts_on(conn, rel)
             conn.commit()
         return rel
+
+    @staticmethod
+    def _link_facts_on(conn: sqlite3.Connection, rel: FactRelation) -> None:
+        """L'insertion seule, sans commit. Même motif que `_update_fact_on`."""
+        conn.execute(
+            "INSERT INTO fact_relations(id, from_fact_id, to_fact_id, "
+            "relation_type, created_at) VALUES (?, ?, ?, ?, ?)",
+            (
+                rel.id,
+                rel.from_fact_id,
+                rel.to_fact_id,
+                rel.relation_type.value,
+                rel.created_at.isoformat(),
+            ),
+        )
 
     def list_relations(self, fact_id: str) -> list[FactRelation]:
         """Toutes les relations dont le fact est source OU cible."""

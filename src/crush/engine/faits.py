@@ -40,6 +40,8 @@ faits ; `retrieval.py` l'attend, réparé, pour ce jour-là.
 
 from __future__ import annotations
 
+from loguru import logger
+
 from crush.kernel.contracts import MemoryStore
 from crush.kernel.schemas import Fact, FactStatus
 
@@ -58,6 +60,44 @@ _PLAFOND = 22
 # a mal découpée. On le tronque plutôt que de laisser une ligne manger le bloc.
 _LONGUEUR_OBJET = 90
 
+# Nombre de tours du tourniquet de sélection : chaque catégorie obtient une place
+# par tour avant qu'aucune n'en obtienne une deuxième.
+#
+# MESURÉ sur la base réelle (41 faits actifs, Pi, 2026-08-22). Le tri était plat
+# — `importance × confiance` puis coupe au plafond — et le PREMIER fait écarté
+# était `persona communicates_as monsieur` : la façon dont Max veut qu'on
+# s'adresse à lui, qui pèse sur chaque réponse, évincée par des faits d'outil
+# mieux notés. La cause n'est pas le score mais la distribution : 15 `preference`
+# et 13 `tool` contre 2 `identity` et 3 `persona`. Une catégorie nombreuse rafle
+# les places, quelle que soit son utilité.
+#
+# 4, parce que 3 laissait sortir la quatrième décision et 5 rendait la main aux
+# préférences. À 22 places et six catégories peuplées, c'est le point où les
+# petites catégories décisives passent toutes.
+_QUOTA = 4
+
+# ── Calibrage des réserves ────────────────────────────────────────────────────
+#
+# L'échelle de confiance du projet (§6.5, `providers/memory/ingest.py`) :
+#
+#     0.55  inférence faible — déduit de ce qu'il a dit
+#     0.75  énoncé explicite — il l'a dit
+#     0.90  correction humaine — il a corrigé
+#     0.99  plafond
+#
+# Le seuil d'affichage était 0.80, donc AU-DESSUS de « énoncé explicite ».
+# Conséquence mesurée sur la base réelle (41 faits actifs, Pi, 2026-08-22) :
+# 37 faits sur 41 valent 0.55 ou 0.75, et 18 des 22 lignes du bloc portaient
+# « _(à confirmer, 75 %)_ ». L'assistant lisait donc un mur de réserves sur des
+# choses que Max avait énoncées lui-même — et rien n'apprend mieux à un modèle à
+# tout relativiser.
+#
+# On met la réserve SOUS l'énoncé explicite : seule une inférence est signalée.
+# Valeur dupliquée et non importée : `engine` ne peut importer que `kernel`
+# (RÈGLE 3), et l'échelle vit dans `providers`. Le lien est fait par ce
+# commentaire, faute de pouvoir l'être par le code.
+_CONFIANCE_ENONCE_EXPLICITE = 0.75
+
 # Les catégories, dans l'ordre où elles servent à répondre. L'identité et la
 # façon de s'adresser à lui d'abord : elles pèsent sur CHAQUE réponse, alors
 # qu'un souvenir d'outil ne pèse que sur les questions qui le concernent.
@@ -65,7 +105,12 @@ _ORDRE_CATEGORIES = (
     "identity",
     "persona",
     "preference",
+    # Absent de `kernel/vocab.CATEGORIES` mais PRESENT dans les donnees reelles
+    # (« max values efficacite operationnelle ») -- vestige d'avant la fermeture
+    # du vocabulaire. On le titre quand meme : un fait existant ne doit pas
+    # sortir en en-tete brute.
     "values",
+    "belief",
     "work_style",
     "constraint",
     "goal",
@@ -75,6 +120,7 @@ _ORDRE_CATEGORIES = (
     "relationship",
     "health_fitness",
     "tool",
+    "memory_correction",
 )
 
 _TITRES = {
@@ -91,6 +137,8 @@ _TITRES = {
     "relationship": "Ses relations",
     "health_fitness": "Santé et forme",
     "tool": "Ses outils",
+    "belief": "Ce qu'il croit",
+    "memory_correction": "Corrections qu'il a apportées",
 }
 
 
@@ -105,10 +153,65 @@ def _poids(fait: Fact) -> float:
     return fait.importance * fait.confidence
 
 
+def _selectionne(retenus: list[Fact], plafond: int, quota: int) -> list[Fact]:
+    """Les `plafond` faits qui obtiennent une place, par tourniquet puis mérite.
+
+    DEUX TOURS, ET C'EST LE POINT
+
+    1. Tourniquet : `quota` tours, et à chaque tour chaque catégorie prend son
+       meilleur fait restant. Une catégorie obtient donc sa deuxième place
+       seulement quand toutes ont eu leur première.
+    2. Mérite : les places restantes vont aux mieux notés, sans égard à la
+       catégorie.
+
+    Le quota est un PLANCHER, pas un plafond — sans le second tour, un bloc de 22
+    places se contenterait de quatre faits par catégorie et gâcherait le reste.
+
+    Pourquoi un tourniquet et non un premier tour glouton dans l'ordre des
+    catégories : glouton, `identity` + `persona` + `preference` consommaient déjà
+    neuf places sur dix, et `decision` — qui porte les règles de fonctionnement —
+    n'était jamais atteint. Le défaut ne se voyait pas à 22 places ; il apparaît
+    dès qu'un appelant resserre le plafond.
+
+    Pourquoi un quota et non un palier par catégorie : essayé, et SIMULÉ sur la
+    base réelle avant d'être écrit. Deux paliers, « ce qui pèse sur chaque
+    réponse » d'abord, produisaient un bloc PIRE — quinze goûts musicaux
+    individuels entraient en évinçant `requires_validation_for déploiement
+    fonctionnalité`. Un palier ne corrige pas le déséquilibre, il le déplace.
+    """
+    par_categorie: dict[str, list[Fact]] = {}
+    for f in retenus:  # `retenus` est déjà trié par poids décroissant
+        par_categorie.setdefault(f.category, []).append(f)
+
+    # Les catégories connues dans leur ordre d'utilité, les inconnues ensuite.
+    # Déterministe : deux bases identiques donnent le même bloc.
+    connues = [c for c in _ORDRE_CATEGORIES if c in par_categorie]
+    ordre = connues + sorted(c for c in par_categorie if c not in _ORDRE_CATEGORIES)
+
+    pris: list[Fact] = []
+    deja = set()
+    for tour in range(max(1, quota)):
+        for categorie in ordre:
+            candidats = par_categorie[categorie]
+            if tour < len(candidats) and len(pris) < plafond:
+                pris.append(candidats[tour])
+                deja.add(candidats[tour].id)
+
+    for f in retenus:
+        if len(pris) >= plafond:
+            break
+        if f.id not in deja:
+            pris.append(f)
+            deja.add(f.id)
+
+    return pris
+
+
 def bloc_memoire(
     store: MemoryStore,
     plafond: int = _PLAFOND,
     confiance_minimale: float = _CONFIANCE_MINIMALE,
+    quota: int = _QUOTA,
 ) -> str:
     """Rend les faits actifs en un bloc Markdown, ou une chaîne vide.
 
@@ -121,17 +224,24 @@ def bloc_memoire(
     """
     try:
         actifs = store.list_facts_by_status(FactStatus.ACTIVE)
-    except Exception:  # noqa: BLE001 — un prompt sans mémoire vaut mieux que pas de réponse
+    except Exception as exc:  # noqa: BLE001 — un prompt sans mémoire vaut mieux que pas de réponse
+        # JOURNALISÉ. Sans cette ligne, une base durablement illisible (verrou,
+        # erreur disque, schéma incompatible) privait l'assistant de toute
+        # mémoire à chaque tour, indéfiniment, sans laisser la moindre trace :
+        # la fonction rend `""` normalement, donc le `try` de l'appelant — qui
+        # journalise, lui — ne se déclenchait jamais.
+        logger.warning("Bloc mémoire : faits illisibles", error=str(exc))
         return ""
 
     retenus = [f for f in actifs if f.confidence >= confiance_minimale]
     if not retenus:
         return ""
 
-    # On coupe sur le poids, PUIS on regroupe. L'inverse aurait laissé une
-    # catégorie bavarde évincer une catégorie décisive.
+    # Trié par poids, puis sélectionné par tourniquet. La coupe franche au
+    # plafond — `retenus[:plafond]` — était précisément le défaut : elle laissait
+    # une catégorie bavarde évincer une catégorie décisive.
     retenus.sort(key=lambda f: (-_poids(f), f.subject, f.predicate))
-    retenus = retenus[: max(1, plafond)]
+    retenus = _selectionne(retenus, max(1, plafond), quota)
 
     par_categorie: dict[str, list[Fact]] = {}
     for f in retenus:
@@ -147,10 +257,15 @@ def bloc_memoire(
             objet = f.object.strip()
             if len(objet) > _LONGUEUR_OBJET:
                 objet = objet[: _LONGUEUR_OBJET - 1] + "…"
-            # La confiance est rendue quand elle n'est pas franche. Un fait à
-            # 55 % ne doit pas être affirmé sur le même ton qu'un fait à 95 % —
-            # sans cette marque, le modèle les traite à égalité.
-            marque = "" if f.confidence >= 0.8 else f" _(à confirmer, {f.confidence:.0%})_"
+            # Un fait déduit ne doit pas être affirmé sur le même ton qu'un fait
+            # énoncé — sans marque, le modèle les traite à égalité. Mais la
+            # marque ne vaut que si elle est RARE : appliquée aux 18 lignes sur
+            # 22 qu'elle couvrait, elle ne distinguait plus rien.
+            #
+            # « déduit » et non « à confirmer » : la première dit d'où vient le
+            # fait, la seconde donne un ordre — et l'assistant s'exécutait, en
+            # redemandant ce qu'il savait déjà.
+            marque = "" if f.confidence >= _CONFIANCE_ENONCE_EXPLICITE else " _(déduit)_"
             lignes.append(f"- {f.predicate} {objet}{marque}")
         lignes.append("")
 

@@ -13,6 +13,7 @@ from loguru import logger
 
 from crush.providers.llm.base import LLMProvider
 from crush.providers.memory.ingest import IngestResult, MemoryIngest
+from crush.providers.memory.kernel import MemoryKernel
 from crush.providers.memory.mirror import MemoryMirror
 
 # Plafond du nombre de sessions ingérées par run deep (la plus récente d'abord).
@@ -95,6 +96,7 @@ class AutoDream:
         sessions_dir: Path,
         memory_ingest: MemoryIngest | None = None,
         mirror: MemoryMirror | None = None,
+        kernel: MemoryKernel | None = None,
         user_firstname: str = "Max",
         assistant_name: str = "Crush",
     ) -> None:
@@ -117,6 +119,11 @@ class AutoDream:
         # (main.py passe None à AutoDream micro, le memory_ingest n'est consommé
         # qu'au deep via _ingest_recent_sessions).
         self._ingest = memory_ingest
+        # Passé SÉPARÉMENT de `memory_ingest`, et non lu à travers lui : la
+        # maintenance de la base (absorption des doublons) doit tourner même
+        # quand `ingest_deep_enabled` est faux, cas où bootstrap ne transmet
+        # aucun ingest.
+        self._kernel = kernel
 
     def _ensure_prefs(self) -> None:
         if not self._prefs_path.exists():
@@ -136,7 +143,13 @@ class AutoDream:
                 self._prefs_path.with_suffix(".md.bak").write_text(
                     self._prefs_path.read_text(encoding="utf-8"), encoding="utf-8"
                 )
-            except OSError as exc:  # noqa: BLE001 — l'écriture prime sur la sauvegarde
+            # `Exception` et non `OSError` : `read_text(encoding="utf-8")` lève un
+            # `UnicodeDecodeError` -- un `ValueError`, pas un `OSError` -- si le
+            # fichier contient un octet invalide. Il remontait alors hors de
+            # `_write_prefs` et sautait l'écriture finale, donc les préférences
+            # n'auraient plus JAMAIS été mises à jour. Exactement l'inverse de ce
+            # que le commentaire ci-dessous annonce.
+            except Exception as exc:  # noqa: BLE001 — l'écriture prime sur la sauvegarde
                 logger.warning("Préférences : sauvegarde impossible", error=str(exc))
         self._prefs_path.write_text(content, encoding="utf-8")
 
@@ -201,30 +214,38 @@ class AutoDream:
             logger.exception("AutoDream deep error", error=str(e))
 
     async def _run_deep(self) -> None:
+        """Une nuit de travail : synthétiser ce qui s'est dit, puis entretenir la base.
+
+        Les deux moitiés sont INDÉPENDANTES. La passe sortait tôt quand aucune
+        session n'était à analyser, ce qui liait l'entretien à l'activité.
+
+        PORTÉE EXACTE, vérifiée : `_load_recent_sessions` ne filtre pas par date
+        — elle prend les cinq derniers fichiers par nom, et `SessionStore` n'en
+        supprime jamais. Dès qu'une seule conversation a eu lieu, la sortie
+        anticipée est donc morte. Ce n'est PAS « un week-end sans parler » : le
+        seul cas concerné est une installation neuve, ou une base migrée, sans
+        aucun fichier de session. L'entretien y tournait jamais — et c'est
+        justement là qu'une base importée peut contenir des doublons.
+        """
         sessions_text = self._load_recent_sessions()
-        if not sessions_text:
-            logger.debug("AutoDream deep: aucune session à analyser")
-            return
+        if sessions_text:
+            await self._synthese_nocturne(sessions_text)
+        else:
+            logger.debug("AutoDream deep: aucune session — entretien seul")
 
-        # 1) Synthèse texte → user_prefs.md (comportement historique préservé).
-        prefs = self._read_prefs()
-        prompt = f"Préférences actuelles :\n{prefs}\n\nSessions récentes :\n{sessions_text}"
-        result = await self._llm.complete(
-            messages=[{"role": "user", "content": prompt}],
-            system=self._deep_system,
-            stream=False,
-            context="memory",
-        )
-        updated = str(result).strip()
-        if updated:
-            self._write_prefs(updated)
-            logger.info("AutoDream deep: préférences mises à jour")
-
-        # 2) Ingestion batch dans le Memory Kernel — UNE extraction par session
-        # entière (jamais par message). Le matcher v2 voit l'état cumulé du
-        # Kernel à chaque ingest individuel → dédoublonnage intra-batch garanti.
-        if self._ingest is not None:
-            await self._ingest_recent_sessions()
+        # 2bis) Absorption des doublons exacts. `find_active_exact` empêche d'en
+        # CRÉER, mais la base en contient déjà : mesuré, 9 faits sur 50. Chacun
+        # coûte une place du bloc mémoire injecté dans le prompt, qui est
+        # plafonné — l'assistant paraissait répéter ce qu'il savait.
+        #
+        # Avant le miroir, qui doit refléter l'état fusionné.
+        if self._kernel is not None:
+            try:
+                absorbes = self._kernel.fusionner_doublons()
+                if absorbes:
+                    logger.info("AutoDream deep: doublons absorbés", nombre=absorbes)
+            except Exception as exc:  # noqa: BLE001 — l'entretien ne casse pas la passe
+                logger.warning("AutoDream deep: fusion des doublons échouée", error=str(exc))
 
         # 3) Régénération du miroir Markdown (SQLite → MD unidirectionnel, §6.7).
         # Tourne UNIQUEMENT en deep nocturne — c'est l'instant où la base est
@@ -239,6 +260,43 @@ class AutoDream:
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("MemoryMirror export échec", error=str(exc))
+
+    async def _synthese_nocturne(self, sessions_text: str) -> None:
+        """Ce qui dépend des sessions de la nuit : la prose de préférences, puis
+        l'ingestion structurée. Séparé de l'entretien de la base, qui doit
+        tourner même quand personne n'a parlé."""
+        # 1) Synthèse texte → user_prefs.md (comportement historique préservé).
+        prefs = self._read_prefs()
+        prompt = f"Préférences actuelles :\n{prefs}\n\nSessions récentes :\n{sessions_text}"
+        result = await self._llm.complete(
+            messages=[{"role": "user", "content": prompt}],
+            system=self._deep_system,
+            stream=False,
+            context="memory",
+        )
+        updated = str(result).strip()
+        if updated:
+            # MÊME garde-fou que la passe micro. Ne l'avoir mis que là était une
+            # correction à moitié : cette passe-ci écrase aussi tout le fichier
+            # sur n'importe quelle sortie non vide. Plus rare — une fois par nuit
+            # — mais plus coûteuse, puisqu'elle porte la synthèse d'une nuit
+            # entière de sessions.
+            refus = _refus_de_remplacement(self._read_prefs(), updated)
+            if refus is not None:
+                logger.warning(
+                    "AutoDream deep: remplacement des préférences REFUSÉ",
+                    raison=refus,
+                    recu=updated[:120],
+                )
+            else:
+                self._write_prefs(updated)
+                logger.info("AutoDream deep: préférences mises à jour")
+
+        # 2) Ingestion batch dans le Memory Kernel — UNE extraction par session
+        # entière (jamais par message). Le matcher v2 voit l'état cumulé du
+        # Kernel à chaque ingest individuel → dédoublonnage intra-batch garanti.
+        if self._ingest is not None:
+            await self._ingest_recent_sessions()
 
     # ── Ingestion batch deep ──────────────────────────────────
 
