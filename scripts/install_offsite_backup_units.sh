@@ -12,11 +12,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# `whoami` vaudrait "root" ici : le script tourne SOUS sudo, mais les scripts
+# qu'il installe doivent s'exécuter en tant que jarvis — c'est son HOME qui
+# contient la clé dédiée et son marqueur d'état. Même résolution que
+# `install_pi.sh` (`RUN_USER="${SUDO_USER:-$USER}"`), pour ne pas réinventer
+# une seconde règle qui diverge de la première.
+CRUSH_USER="${SUDO_USER:-$USER}"
+
 for f in deploy/systemd/crush-offsite-backup.service \
          deploy/systemd/crush-offsite-backup.timer \
          deploy/systemd/crush-offsite-backup-check.service \
          deploy/systemd/crush-offsite-backup-check.timer; do
-    sed -e "s|__CRUSH_DIR__|$(pwd)|g" -e "s|__CRUSH_USER__|$(whoami)|g" "$f" \
+    sed -e "s|__CRUSH_DIR__|$(pwd)|g" -e "s|__CRUSH_USER__|$CRUSH_USER|g" "$f" \
         > "/etc/systemd/system/$(basename "$f")"
     echo "  installé : $(basename "$f")"
 done
