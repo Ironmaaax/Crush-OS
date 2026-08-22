@@ -190,6 +190,21 @@ class Scheduler:
                 ),
                 "interval": "quotidien" if self._settings.backup_enabled else "désactivée",
             },
+            {
+                "name": "Boîte de réception",
+                "description": (
+                    "Relit les consignes écrites dans Obsidian et applique les corrections"
+                ),
+                # Pas d'heure fixe : c'est une boucle à intervalle. Inventer un
+                # « prochain passage » exact serait faux — la boucle a démarré au
+                # boot, et rien ici ne sait quand elle a tourné la dernière fois.
+                "next_run": None,
+                "interval": (
+                    f"toutes les {max(1, self._settings.obsidian_inbox_interval_minutes)} min"
+                    if self._settings.obsidian_inbox_enabled
+                    else "désactivée"
+                ),
+            },
         ]
 
     # ── Routines ──────────────────────────────────────────────

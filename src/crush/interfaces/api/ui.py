@@ -129,6 +129,7 @@ async def graphe_ui() -> Response:
             ("/graphe.css", "src/crush/interfaces/ui/static/graphe.css"),
             ("/three.min.js", "src/crush/interfaces/ui/static/three.min.js"),
             ("/_shared.js", "src/crush/interfaces/ui/static/_shared.js"),
+            ("/apercu.js", "src/crush/interfaces/ui/static/apercu.js"),
             ("/graphe.js", "src/crush/interfaces/ui/static/graphe.js"),
         ],
     )

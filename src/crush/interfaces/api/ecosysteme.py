@@ -64,6 +64,22 @@ def _maillon(
     }
 
 
+def canal_actif(nom: str) -> bool:
+    """Ce canal est-il reellement allume ?
+
+    Lit la VARIABLE D'ENVIRONNEMENT, pas un champ de `Settings` : aucun
+    `telegram_enabled` n'existe dans le modele, et un `getattr(settings, ...,
+    False)` y renvoyait donc toujours faux. Consequence observee : la page
+    affichait Telegram « dormant » pendant que le bot repondait. C'est
+    exactement le piege que cette page se donne pour mission d'eviter --- lire
+    la configuration au lieu de la realite.
+
+    Le canal lui-meme decide de la meme facon (`telegram_bot.py` lit
+    `os.getenv`), donc les deux ne peuvent pas divorcer.
+    """
+    return os.getenv(f"{nom.upper()}_ENABLED", "false").strip().lower() == "true"
+
+
 def _cerveau() -> list[dict]:
     """Le modèle qui répond, et celui qui réfléchit."""
     backend = settings.api_backend

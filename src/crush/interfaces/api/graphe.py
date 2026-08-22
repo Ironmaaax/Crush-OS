@@ -44,6 +44,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from crush.interfaces.api.ecosysteme import canal_actif
 from crush.kernel.remote_agents import registry
 from crush.kernel.settings import settings
 
@@ -225,7 +226,7 @@ def _construire(request: Request) -> _Graphe:
 
     # ── Les canaux ───────────────────────────────────────────────────────────
     for canal in _CANAUX:
-        actif = bool(getattr(settings, f"{canal.lower()}_enabled", False))
+        actif = canal_actif(canal)
         cid = g.noeud(
             "canal:" + canal,
             "canal",

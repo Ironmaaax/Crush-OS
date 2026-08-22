@@ -64,14 +64,64 @@
 
   /* ── Chargement ─────────────────────────────────────────────────────────── */
 
+  /* La room Cerveau a deux sous-pages : l'etat (Apercu) et la forme (Graphe).
+   *
+   * On DEMONTE entierement la scene en quittant le graphe, et on la reconstruit
+   * en y revenant. Garder la scene vivante derriere l'apercu ferait tourner une
+   * boucle de rendu 3D pour rien -- sur un telephone, c'est la batterie qui
+   * paie. Le cout du retour est un fetch et une remise en place de la
+   * disposition : quelques centaines de millisecondes, une fois. */
+  function demonterGraphe() {
+    if (animation !== null) {
+      cancelAnimationFrame(animation);
+      animation = null;
+    }
+    if (rendu) {
+      // `dispose()` libere le contexte WebGL. Sans lui, un aller-retour repete
+      // finit par epuiser le nombre de contextes que le navigateur accorde, et
+      // la scene ne s'affiche plus du tout sans message d'erreur.
+      rendu.dispose();
+      if (rendu.domElement && rendu.domElement.parentNode) {
+        rendu.domElement.parentNode.removeChild(rendu.domElement);
+      }
+    }
+    rendu = null; scene = null; camera = null;
+    spheres = []; aretes = null; geoAretes = null;
+    labels = [];
+    calqueLabels.innerHTML = "";
+    document.getElementById("graphe-ui").innerHTML = "";
+    selection = null; ancre = null; chemin = new Set();
+    typesCaches = new Set(); recherche = ""; survole = null;
+    conteneur.hidden = true;
+    calqueLabels.hidden = true;
+  }
+
+  async function allerA(page) {
+    const apercu = document.getElementById("graphe-apercu");
+    if (page === "apercu") {
+      demonterGraphe();
+      apercu.hidden = false;
+      if (window.CrushApercu) await window.CrushApercu.render(apercu);
+      return;
+    }
+    apercu.hidden = true;
+    apercu.innerHTML = "";
+    conteneur.hidden = false;
+    calqueLabels.hidden = false;
+    await construireGraphe();
+  }
+
   async function demarrer() {
     J.mountRooms({
       mode: "cerveau",
-      pages: [{ id: "graphe", label: "Graphe" }],
-      activePage: "graphe",
-      onNav: function () {},
+      pages: [{ id: "apercu", label: "Aperçu" }, { id: "graphe", label: "Graphe" }],
+      activePage: "apercu",
+      onNav: function (id) { allerA(id); },
     });
+    await allerA("apercu");
+  }
 
+  async function construireGraphe() {
     try {
       donnees = await J.api.get("/api/graphe");
     } catch (e) {

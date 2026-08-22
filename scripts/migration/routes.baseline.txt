@@ -26,6 +26,7 @@ GET     /api/analytics/crush
 GET     /api/analytics/data
 GET     /api/analytics/summary
 GET     /api/analytics/youtube
+GET     /api/apercu
 GET     /api/approvals/config
 GET     /api/auth/status
 GET     /api/briefing/preset/{preset_id}

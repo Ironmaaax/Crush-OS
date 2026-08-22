@@ -40,6 +40,7 @@ from crush.engine.background.routines import ROUTINES_ENABLED, Routine, RoutineS
 from crush.interfaces.api.admin import _ui_router as admin_ui_router
 from crush.interfaces.api.admin import router as admin_router
 from crush.interfaces.api.agent_ws import router as agent_ws_router
+from crush.interfaces.api.apercu import router as apercu_router
 from crush.interfaces.api.auth import router as auth_router
 from crush.interfaces.api.briefing import router as briefing_router
 from crush.interfaces.api.budget import router as budget_router
@@ -127,6 +128,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.memory_ingest = container.memory_ingest
     # Pour /api/presence et le maillon Ecosysteme.
     app.state.presence = container.presence
+    # Pour l'apercu : le cout reel et les initiatives en attente.
+    app.state.tracker = container.tracker
     app.state.boite_memoire = container.boite_memoire
     app.state.skill_synthesizer = container.skill_synthesizer
     app.state.skill_lab = container.skill_lab
@@ -305,6 +308,7 @@ app.include_router(admin_router)
 app.include_router(projects_router)
 app.include_router(ecosysteme_router)
 app.include_router(graphe_router)
+app.include_router(apercu_router)
 app.include_router(widgets_router)
 app.include_router(spotify_router)
 app.include_router(deezer_router)
