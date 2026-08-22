@@ -202,6 +202,17 @@ install_unit crush-alerte@.service
 install_unit crush-sante.service
 install_unit crush-sante.timer
 
+# Push de la sauvegarde locale vers une destination hors machine, quand
+# `scripts/offsite_backup.sh` a été configuré (voir ce fichier — nécessite une
+# clé SSH dédiée et un serveur SFTP côté destination, posés manuellement une
+# fois). Posé mais pas forcément utile : une machine sans destination configurée
+# verra juste le push échouer proprement (PC injoignable), sans casser
+# l'installation.
+install_unit crush-offsite-backup.service
+install_unit crush-offsite-backup.timer
+install_unit crush-offsite-backup-check.service
+install_unit crush-offsite-backup-check.timer
+
 # Partage WebDAV du miroir pour Obsidian. L'unité est POSÉE mais pas activée :
 # elle donne accès en lecture-écriture à tout ce que l'assistant sait de son
 # utilisateur, et cela ne doit pas s'allumer parce qu'on a lancé un installateur.
@@ -218,11 +229,17 @@ sudo mkdir -p "$UNIT_DIR/crush-api.service.d"
 sudo cp "$PROJECT_DIR/deploy/systemd/crush-api.service.d/alerte.conf"         "$UNIT_DIR/crush-api.service.d/alerte.conf"
 ok "alerte.conf installé (drop-in crush-api)"
 
-chmod +x "$PROJECT_DIR/scripts/alerte.sh" "$PROJECT_DIR/scripts/sante.sh"
+chmod +x "$PROJECT_DIR/scripts/alerte.sh" "$PROJECT_DIR/scripts/sante.sh" \
+         "$PROJECT_DIR/scripts/offsite_backup.sh" "$PROJECT_DIR/scripts/offsite_backup_check.sh"
 
 sudo systemctl daemon-reload
 
 ENABLED_UNITS=(crush-api.service crush-sante.timer)
+# Uniquement si la clé dédiée existe déjà : sinon les deux timers tourneraient
+# pour rien toutes les deux heures sur une machine où la destination n'a jamais
+# été configurée.
+[ -f "$HOME/.ssh/id_ed25519_backup_pc" ] && \
+    ENABLED_UNITS+=(crush-offsite-backup.timer crush-offsite-backup-check.timer)
 # Déjà configuré une fois : on ne coupe pas ce qui marchait.
 [ -f "$PROJECT_DIR/.env.webdav" ] && ENABLED_UNITS+=(crush-webdav.service)
 

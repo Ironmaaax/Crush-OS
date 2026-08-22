@@ -1,0 +1,16 @@
+# Copyright (C) 2026 Maxime Song
+#
+# Cadence de la vérification de fraîcheur. 6h : assez court pour qu'un problème
+# de fond (clé révoquée, PC en panne longue durée) soit signalé dans la journée,
+# assez long pour rester un contrôle léger.
+[Unit]
+Description=Assistant — cadence du controle de fraicheur hors machine
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+# Copyright (C) 2026 Maxime Song
+#
+# Alerte si la sauvegarde hors machine traîne trop derrière. Voir
+# scripts/offsite_backup_check.sh pour la logique (alerte sur transition
+# d'ancienneté, jamais sur un échec ponctuel).
+[Unit]
+Description=Assistant — fraicheur de la sauvegarde hors machine
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+ExecStart=/usr/bin/env bash __CRUSH_DIR__/scripts/offsite_backup_check.sh
+SuccessExitStatus=0 1
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target

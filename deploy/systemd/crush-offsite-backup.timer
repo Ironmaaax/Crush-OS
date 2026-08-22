@@ -1,0 +1,20 @@
+# Copyright (C) 2026 Maxime Song
+#
+# Cadence du push hors machine.
+#
+# Toutes les 2h, et non une fois par nuit : rien ne garantit que le PC de Max
+# soit allumé à l'heure de la sauvegarde locale (4h). Un tirage régulier
+# rattrape son retard dès que le PC se rallume, quel que soit le nombre de
+# tentatives ratées entre-temps — sans jamais alerter sur un échec isolé (voir
+# offsite_backup_check.timer pour l'alerte, basée sur l'ANCIENNETÉ, pas l'échec).
+[Unit]
+Description=Assistant — cadence du push de sauvegarde hors machine
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=2h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

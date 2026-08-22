@@ -1,0 +1,23 @@
+# Copyright (C) 2026 Maxime Song
+#
+# Pousse la dernière sauvegarde locale vers le PC Windows de Max, par SFTP,
+# via une clé restreinte à `internal-sftp` (pas de shell, pas de commande).
+#
+# Déclenché par crush-offsite-backup.timer — voir ce fichier pour la cadence.
+[Unit]
+Description=Assistant — push de la sauvegarde hors machine
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__CRUSH_USER__
+WorkingDirectory=__CRUSH_DIR__
+ExecStart=/usr/bin/env bash __CRUSH_DIR__/scripts/offsite_backup.sh
+# Sort 1 quand le PC est simplement injoignable — l'état normal la plupart du
+# temps, pas une erreur d'exécution. Sans ceci, chaque tentative ratée
+# remplirait le journal d'unités « failed ».
+SuccessExitStatus=0 1
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
