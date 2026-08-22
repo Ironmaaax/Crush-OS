@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import unicodedata
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -164,6 +165,17 @@ _MAX_TERMES = 12
 # attraper les flexions : `projets` doit trouver « projet ».
 _LONGUEUR_MIN_RACINE = 6
 _LONGUEUR_RACINE = 5
+
+
+def _mots(texte: str) -> frozenset[str]:
+    """L'ensemble des mots d'un libellé, accents et ponctuation retirés.
+
+    Sert au rapprochement des variantes : « format audio .ogg » et « format ogg »
+    doivent se comparer sans que le point ni l'accent ne comptent.
+    """
+    sans_accent = unicodedata.normalize("NFD", texte.lower())
+    sans_accent = "".join(c for c in sans_accent if unicodedata.category(c) != "Mn")
+    return frozenset(re.findall(r"[a-z0-9]+", sans_accent))
 
 
 def _termes_fts(query: str) -> list[str]:
@@ -495,6 +507,104 @@ class MemoryKernel:
                 "Doublons de faits fusionnes", absorbes=absorbes, groupes=len(groupes)
             )
         return absorbes
+
+    def fusionner_variantes(self, mots_en_trop: int = 2) -> int:
+        """Absorbe les VARIANTES d'un même fait. Rend le nombre absorbé.
+
+        `fusionner_doublons` ne voit que l'identique. Or la base contenait des
+        paires qui ne diffèrent que par la formulation, mesurées le 22/08/2026 :
+
+            uses    format audio .ogg   /  format ogg
+            uses    globe terrestre interactif  /  globe
+            prefers titanium david guetta  /  titanium
+
+        RÈGLE : même (sujet, prédicat, catégorie), et l'ensemble des mots de l'un
+        CONTENU dans celui de l'autre, avec au plus `mots_en_trop` mots d'écart.
+
+        Le plafond d'écart est le garde-fou. Sans lui, « jazz » absorberait
+        n'importe quel fait commençant par jazz ; avec lui, le rapprochement
+        reste celui d'une reformulation, pas d'une notion voisine.
+
+        C'EST UNE HEURISTIQUE, et elle se trompera. Trois raisons de l'accepter :
+        elle est bornée à une catégorie (jamais de glissement entre `tool` et
+        `preference`, dont j'ai mesuré qu'il vidait `persona`), rien n'est effacé
+        — SUPERSEDED et relié, donc réversible — et chaque fusion journalise les
+        DEUX libellés, donc une erreur est visible et non silencieuse.
+
+        Survivant : le plus observé, puis le libellé le plus LONG. Le plus long,
+        parce qu'entre « globe » et « globe terrestre interactif » c'est le
+        second qui reste compréhensible dans six mois — la brièveté est demandée
+        à l'extraction, pas payée par la perte d'information.
+        """
+        actifs = self.list_facts_by_status(FactStatus.ACTIVE)
+
+        par_cle: dict[tuple[str, str, str], list[Fact]] = {}
+        for f in actifs:
+            par_cle.setdefault((f.subject, f.predicate, f.category), []).append(f)
+
+        absorbes = 0
+        for faits in par_cle.values():
+            if len(faits) < 2:
+                continue
+            # Du plus long au plus court : un groupe est mené par son libellé le
+            # plus informatif, et les variantes plus courtes viennent s'y ranger.
+            restants = sorted(faits, key=lambda f: (-len(_mots(f.object)), f.object))
+            groupes: list[list[Fact]] = []
+            for f in restants:
+                mots = _mots(f.object)
+                for g in groupes:
+                    chef = _mots(g[0].object)
+                    if mots <= chef and len(chef) - len(mots) <= mots_en_trop:
+                        g.append(f)
+                        break
+                else:
+                    groupes.append([f])
+
+            for g in groupes:
+                if len(g) < 2:
+                    continue
+                g.sort(key=lambda f: (-f.support_count, -len(f.object)))
+                absorbes += self._absorber(g)
+
+        return absorbes
+
+    def _absorber(self, groupe: list[Fact]) -> int:
+        """Fusionne un groupe déjà ordonné (survivant en tête) en UNE transaction.
+
+        Même exigence d'atomicité que `fusionner_doublons` : le survivant reçoit
+        le total du groupe, donc un plantage avant l'archivage des autres ferait
+        re-sommer ce total à la passe suivante, indéfiniment.
+        """
+        survivant, variantes = groupe[0], groupe[1:]
+        survivant.support_count = sum(f.support_count for f in groupe)
+        survivant.confidence = max(f.confidence for f in groupe)
+        survivant.importance = max(f.importance for f in groupe)
+        survivant.last_seen_at = max(f.last_seen_at for f in groupe)
+
+        with self._conn() as conn:
+            self._update_fact_on(conn, survivant)
+            for v in variantes:
+                v.status = FactStatus.SUPERSEDED
+                self._update_fact_on(conn, v)
+                self._link_facts_on(
+                    conn,
+                    FactRelation(
+                        id=_new_id("rel"),
+                        from_fact_id=survivant.id,
+                        to_fact_id=v.id,
+                        relation_type=RelationType.SUPERSEDES,
+                        created_at=datetime.now(),
+                    ),
+                )
+            conn.commit()
+
+        logger.info(
+            "Variantes de faits absorbees",
+            garde=survivant.object,
+            absorbes=[v.object for v in variantes],
+            predicate=survivant.predicate,
+        )
+        return len(variantes)
 
     def find_active_exact(
         self, subject: str, predicate: str, object: str, category: str  # noqa: A002

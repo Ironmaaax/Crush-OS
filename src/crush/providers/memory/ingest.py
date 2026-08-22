@@ -120,6 +120,26 @@ def _build_prompt(content: str, source: str, name: str = "Max") -> str:
         f"long terme de {name}. 0.3 = anecdotique, 0.7 = significatif, 0.9 = pivot.\n"
         "- Si tu utilises un prédicat ou une catégorie HORS de la liste, le fait sera "
         "rejeté en `needs_review`. Préfère renvoyer moins.\n\n"
+        "## Ce qui N'EST PAS un fait (cas réels, à ne plus produire)\n"
+        "Ces cinq erreurs ont été relevées dans la base existante. Chacune a coûté "
+        "une place dans la mémoire injectée, qui est plafonnée.\n"
+        f"- **Une action demandée n'est pas une préférence.** {name} demande de jouer "
+        "un morceau : c'est une commande, pas un goût. `prefers creep radiohead` "
+        "n'aurait pas dû exister. Un goût s'énonce ('j'aime le jazz'), il ne se "
+        "déduit pas d'une écoute.\n"
+        "- **La cible d'une action n'est pas un outil.** Le morceau joué n'est pas un "
+        "outil : `uses iris` est faux, l'outil était Spotify. `tool` désigne ce avec "
+        f"quoi {name} travaille, jamais ce qu'il consomme.\n"
+        "- **Un élément de ton interface n'est pas un outil.** Une vue, un graphe, une "
+        "page que tu lui as construite ne sont pas des outils qu'il utilise : la règle "
+        "'jamais de fait dont le sujet est l'assistant' vaut aussi pour ses parties. "
+        "`uses globe`, `uses sphère d'accueil` n'auraient pas dû exister.\n"
+        "- **Ce qui est mentionné n'est pas ce qui est possédé.** Parler d'un Mac ne "
+        "veut pas dire en avoir un. N'extrais que ce que l'échange AFFIRME de "
+        f"{name}, pas ce qu'il évoque.\n"
+        "- **Un objet incompréhensible hors contexte n'est pas un fait.** `decided "
+        "paris` ne dit pas ce qui a été décidé. Si l'objet seul ne se comprend pas "
+        "dans six mois, n'extrais rien.\n\n"
         "## Forme canonique (CRITIQUE — évite les doublons sémantiques en aval)\n"
         "Le matching de réconciliation s'appuie sur (subject, predicate, category) + "
         "comparaison d'object. Si tu paraphrases, tu crées des doublons ou "
@@ -143,7 +163,10 @@ def _build_prompt(content: str, source: str, name: str = "Max") -> str:
         "- Pas d'articles inutiles ('le', 'la', 'au', 'du'). Pas de mots de remplissage "
         "('comme habitude de vie', 'pour cette année', 'aujourd\\'hui').\n"
         "- En cas de doute entre deux formulations, choisis la PLUS COURTE et la plus "
-        "factuelle. Ex. 'course à pied' plutôt que 'la course à pied régulière'.\n\n"
+        "factuelle. Ex. 'course à pied' plutôt que 'la course à pied régulière'.\n"
+        "- PAS de parenthèses. 'iris (goo goo dolls)' et 'iris goo goo dolls' sont "
+        "devenus deux faits distincts dans la base réelle : écris 'iris goo goo "
+        "dolls'.\n\n"
         "## Format de sortie\n"
         '{\n  "facts": [\n'
         '    {\n      "subject": "' + name + '",\n      "predicate": "prefers",\n'
@@ -612,6 +635,30 @@ def _parse_arbiter_verdict(raw: str) -> _ArbiterVerdict:
     )
 
 
+_PARENTHESES_RE = re.compile(r"[()\[\]{}]")
+_ESPACES_RE = re.compile(r"\s+")
+
+
+def _canonise_objet(obj: str) -> str:
+    """Forme canonique de l'objet d'un fait, avant toute réconciliation.
+
+    MESURÉ sur la base réelle : `prefers iris (goo goo dolls)` et `prefers iris
+    goo goo dolls` coexistaient, tout comme `titanium` et `titanium (david
+    guetta)`. Deux faits, une seule idée, et deux places dans un bloc mémoire
+    plafonné — pour une différence de deux parenthèses.
+
+    Le prompt d'extraction demande déjà une forme canonique, mais un prompt est
+    une consigne, pas une garantie. Ici la parenthèse disparaît avant le
+    rapprochement, donc `find_active_exact` reconnaît le fait et le CONFIRME au
+    lieu d'en créer un jumeau — le support monte au lieu de se diviser.
+
+    On retire les parenthèses en gardant leur contenu : il porte l'information
+    (l'artiste, la précision). C'est la ponctuation qui est du bruit, pas le mot.
+    """
+    sans = _PARENTHESES_RE.sub(" ", obj)
+    return _ESPACES_RE.sub(" ", sans).strip()
+
+
 def _parse_extract_response(raw: str) -> list[_Candidate]:
     """Tolère ```json ... ``` autour et extrait la liste `facts`."""
     candidate = raw.strip()
@@ -647,6 +694,9 @@ def _parse_extract_response(raw: str) -> list[_Candidate]:
             imp = float(imp_raw)
         except (TypeError, ValueError):
             imp = 0.5
+        obj = _canonise_objet(obj)
+        if not obj:
+            continue
         out.append(
             _Candidate(
                 subject=subj,

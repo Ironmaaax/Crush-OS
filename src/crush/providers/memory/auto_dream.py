@@ -247,6 +247,16 @@ class AutoDream:
             except Exception as exc:  # noqa: BLE001 — l'entretien ne casse pas la passe
                 logger.warning("AutoDream deep: fusion des doublons échouée", error=str(exc))
 
+            # Puis les VARIANTES : même idée, formulation différente. Après
+            # l'identique et jamais avant — un groupe déjà réduit à un fait ne
+            # peut plus être mal rapproché par l'heuristique.
+            try:
+                variantes = self._kernel.fusionner_variantes()
+                if variantes:
+                    logger.info("AutoDream deep: variantes absorbées", nombre=variantes)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("AutoDream deep: fusion des variantes échouée", error=str(exc))
+
         # 3) Régénération du miroir Markdown (SQLite → MD unidirectionnel, §6.7).
         # Tourne UNIQUEMENT en deep nocturne — c'est l'instant où la base est
         # stable après ingestion. Échec silencieux : le miroir est secondaire.
