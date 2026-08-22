@@ -240,6 +240,20 @@ class FTSIndex(Protocol):
 
 
 @runtime_checkable
+class Transcripteur(Protocol):
+    """Reconnaissance vocale (cf. providers/audio/stt.py).
+
+    Le Protocol existe déjà côté provider, mais `capabilities` ne peut importer
+    que `kernel` (RÈGLE 2) : sans cette déclaration ici, aucun outil ne pouvait
+    atteindre la reconnaissance vocale. Elle n'était donc branchée qu'au
+    WebSocket vocal, en `interfaces` (L3), qui a le droit d'importer
+    `providers` — d'où une capacité présente dans le code et absente des outils.
+    """
+
+    async def transcribe(self, audio: bytes, mime_type: str) -> str: ...
+
+
+@runtime_checkable
 class VectorIndex(Protocol):
     """Index vectoriel multilingue des topics + transcripts (cf. memory/search.py)."""
 

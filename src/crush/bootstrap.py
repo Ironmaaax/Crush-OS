@@ -60,6 +60,7 @@ from crush.capabilities.tools.show_view import ShowViewTool
 from crush.capabilities.tools.skills import SkillCreateTool, SkillImproveTool, SkillListTool
 from crush.capabilities.tools.spotify import SpotifyTool
 from crush.capabilities.tools.subagent import ScriptRPCTool, SpawnSubagentTool
+from crush.capabilities.tools.transcription import TranscribeAudioTool
 from crush.capabilities.tools.vision import VisionTool
 from crush.capabilities.tools.weather import WeatherTool
 from crush.engine.agent import _VOICE_PROMPT_PATH, Agent
@@ -340,6 +341,9 @@ def build(
         VisionTool(visual_memory=_visual_memory),
         ReadFileTool(allowed_roots=allowed_roots),
         FindFilesTool(allowed_roots=allowed_roots),
+        # La reconnaissance vocale existait mais n'était atteignable que par le
+        # WebSocket vocal : aucun outil ne pouvait transcrire un fichier.
+        TranscribeAudioTool(allowed_roots=allowed_roots, transcripteur=stt),
         CLIRunnerTool(whitelist_path=Path(settings.cli_whitelist_path)),
         ExecuteCLITool(),
         calendar_list_tool,

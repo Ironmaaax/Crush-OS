@@ -92,6 +92,22 @@ printf "  uv sync (cœur seul, sans extras)…\n"
 uv sync --frozen
 ok "Environnement Python prêt"
 
+# faster-whisper SEUL, et non l'extra `local-audio` en entier : celui-ci tire
+# aussi `sounddevice`, qui exige PortAudio en bibliothèque système — inutile sur
+# un serveur sans micro, et un point d'échec de plus à l'installation.
+#
+# Pourquoi ce n'est pas optionnel : la reconnaissance vocale est en cascade
+# (OpenAI Whisper, puis modèle local). Sans le moteur local, un quota OpenAI
+# épuisé ne dégrade pas le service, il le SUPPRIME — constaté sur la machine de
+# production le 22/08/2026 : entrée vocale et transcription de fichiers toutes
+# deux hors service, avec pour seule trace un avertissement dans le journal.
+printf "  Moteur de transcription local (faster-whisper)…\n"
+if uv pip install "faster-whisper>=1.1.0"; then
+    ok "Transcription locale disponible (repli hors ligne)"
+else
+    warn "faster-whisper non installé : la transcription dépendra entièrement d'OpenAI."
+fi
+
 # Assets front lourds (MediaPipe + modèles, ~64 Mo). Hors git : sans eux
 # l'interface irait les chercher chez un tiers à chaque chargement de page, ce
 # qu'on a justement supprimé. Non bloquant : seules la reconnaissance faciale,
